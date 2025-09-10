@@ -7,24 +7,18 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-
 <style>
-  :root{
-    --brand:#2563eb; --brand-2:#1d4ed8; --ok:#16a34a; --warn:#d97706; --bad:#b91c1c;
+  :root{ --brand:#2563eb; --brand-2:#1d4ed8; --ok:#16a34a; --warn:#d97706; --bad:#b91c1c;
     --text:#0b1220; --muted:#6b7280; --line:#e5e7eb; --surface:#fff; --surface-2:#f8fafc;
-    --shadow:0 14px 36px rgba(2,8,23,.10); --radius:16px;
-  }
+    --shadow:0 14px 36px rgba(2,8,23,.10); --radius:16px; }
   @media (prefers-color-scheme: dark){
     :root{ --text:#e5e7eb; --muted:#9ca3af; --line:#1f2937; --surface:#111827; --surface-2:#0b1220; --shadow:0 20px 40px rgba(0,0,0,.4); }
   }
   *{box-sizing:border-box}
-  body{
-    margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial; color:var(--text);
-    background:
-      radial-gradient(1200px 600px at -10% -20%, rgba(37,99,235,.08), transparent 60%),
-      radial-gradient(900px 500px at 120% -10%, rgba(29,78,216,.06), transparent 60%),
-      linear-gradient(160deg,#f7fbff 0%,#f5f7fb 100%)
-  }
+  body{ margin:0; font-family:Inter,system-ui,Segoe UI,Roboto,Arial; color:var(--text);
+    background: radial-gradient(1200px 600px at -10% -20%, rgba(37,99,235,.08), transparent 60%),
+               radial-gradient(900px 500px at 120% -10%, rgba(29,78,216,.06), transparent 60%),
+               linear-gradient(160deg,#f7fbff 0%,#f5f7fb 100%) }
   header{position:sticky; top:0; z-index:10; background:linear-gradient(120deg,rgba(37,99,235,.10),rgba(37,99,235,.08)); border-bottom:1px solid var(--line); backdrop-filter:blur(8px)}
   .wrap{max-width:1200px; margin:0 auto; padding:16px}
   h1{margin:0; font-size:20px; font-weight:800}
@@ -56,14 +50,9 @@
   .tag{display:inline-block; padding:2px 6px; border-radius:999px; border:1px solid var(--line); font-size:11px; background:#f1f5f9}
   .due{color:#fff; background:#ef4444; padding:2px 6px; border-radius:8px; font-weight:800; font-size:11px}
   .table-scroll{width:100%; overflow:auto}
-  .hide{display:none}
   #loading{display:none; align-items:center; gap:8px; font-weight:800}
-
-  /* Overlay Auth */
   #auth{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.06);backdrop-filter:blur(4px);z-index:9999}
   #auth .panel{width:360px;max-width:94%;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}
-
-  /* Modal */
   .modal{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; padding:18px; z-index:1000}
   .panel{max-width:900px; width:100%; background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; max-height:90vh}
   .panel .head{position:sticky; top:0; background:var(--surface); border-bottom:1px solid var(--line); padding:14px; display:flex; align-items:center; justify-content:space-between; gap:8px; z-index:1}
@@ -157,6 +146,9 @@
         <select id="flt_meeting" onchange="render()">
           <option value="">Takim (gjithë)</option><option>Pending</option><option>Accepted</option><option>Refused - Closed</option>
         </select>
+        <label class="btn"><i class="fa-solid fa-user"></i>
+          <input type="checkbox" id="flt_mine" onchange="render()" style="margin-left:6px"> Vetëm të miat
+        </label>
         <label class="btn"><i class="fa-solid fa-sort"></i>
           <select id="sortBy" onchange="render()" style="border:0;background:transparent">
             <option value="created_desc">Më të rejat</option>
@@ -201,7 +193,7 @@
           <div><label>Activity</label><input id="m_activity"></div>
         </div>
 
-        <div class="row-2" style="margin-top:8px">
+        <div class="row-3" style="margin-top:8px">
           <div>
             <label>Përditëso rezultat</label>
             <select id="m_result">
@@ -209,6 +201,11 @@
             </select>
           </div>
           <div><label>Follow-up (auto +3 ditë në eskalim/mendim)</label><input id="m_next" type="date"></div>
+          <div>
+            <label>Cakto te (user)</label>
+            <select id="m_assignee"></select>
+            <div class="muted" id="m_assignee_meta"></div>
+          </div>
         </div>
 
         <div class="row-3">
@@ -266,17 +263,17 @@
 /* ===== SUPABASE ===== */
 const SUPABASE_URL = 'https://xsdcprmwthmqzorojykl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzZGNwcm13dGhtcXpvcm9qeWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NDU2ODUsImV4cCI6MjA3MzAyMTY4NX0.xql-MTN1szGVtdJkMmGxYRZ4mXNJ1a2vSXV2Fb1o4fw';
-
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-});
-console.log('[Supabase]', SUPABASE_URL);
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession:true, autoRefreshToken:true, detectSessionInUrl:true }});
 
 /* ===== STATE/UTIL ===== */
 let LEADS = [];
 let COMMENTS = {};
 let COUNTS = new Map();
 let CURRENT_ID = null;
+let CURRENT_PROFILE = { id:null, email:'', role:'viewer' };
+let CAN_EDIT = false;
+let ASSIGNABLE_USERS = []; // [{id,email,full_name,role}]
+
 const EL = sel => document.querySelector(sel);
 const ESC = s => (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
 function todayStr(d=new Date()){ const z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
@@ -287,11 +284,44 @@ async function updateHeaderUser(session){
   const slot = EL('#user_slot');
   if(slot) slot.textContent = session?.user?.email ? ('• '+session.user.email) : '';
 }
+function lockUI(readonly){
+  [
+    '#f_company','#f_contact','#f_phone','#f_email','#f_nipt',
+    '#f_industry','#f_activity','#f_source','#f_call_status',
+    '#f_answer_outcome','#f_field_agent','#f_meeting_date','#f_notes'
+  ].forEach(sel=>{ const el=EL(sel); if(el){ el.disabled=readonly; el.readOnly=readonly; }});
+  const addBtn = document.querySelector('button.primary[onclick="addLead()"]');
+  if(addBtn) addBtn.style.display = readonly ? 'none' : 'inline-flex';
+}
+async function fetchMyProfile(){
+  try{
+    const { data:{ user } } = await sb.auth.getUser();
+    const email = user?.email || '';
+    const id = user?.id || null;
+    let role = 'viewer';
+    if(id){
+      const { data, error } = await sb.from('profiles').select('role,email,full_name').eq('id', id).single();
+      if(!error && data){ role = data.role || 'viewer'; }
+    }
+    CURRENT_PROFILE = { id, email, role };
+    CAN_EDIT = ['editor','admin'].includes(role);
+    lockUI(!CAN_EDIT);
+  }catch(e){
+    CURRENT_PROFILE = { id:null, email:'', role:'viewer' };
+    CAN_EDIT = false; lockUI(true);
+  }
+}
+async function fetchAssignableUsers(){
+  const { data, error } = await sb.from('profiles').select('id,email,full_name,role').order('email');
+  if(!error && data) ASSIGNABLE_USERS = data;
+}
 async function requireSession(){
   const { data: { session } } = await sb.auth.getSession();
   if(session){
     EL('#auth').style.display='none';
     await updateHeaderUser(session);
+    await fetchMyProfile();
+    await fetchAssignableUsers();
     return true;
   }else{
     EL('#auth').style.display='flex';
@@ -307,6 +337,8 @@ async function signIn(){
     EL('#auth').style.display='none';
     const { data:{ session } } = await sb.auth.getSession();
     await updateHeaderUser(session);
+    await fetchMyProfile();
+    await fetchAssignableUsers();
     await refreshLeads();
   }
 }
@@ -326,6 +358,8 @@ sb.auth.onAuthStateChange(async (_evt, session) => {
   if(session){
     EL('#auth').style.display='none';
     await updateHeaderUser(session);
+    await fetchMyProfile();
+    await fetchAssignableUsers();
     await refreshLeads();
   }else{
     EL('#auth').style.display='flex';
@@ -334,40 +368,32 @@ sb.auth.onAuthStateChange(async (_evt, session) => {
 
 /* ===== DB: COUNTS ===== */
 async function fetchCounts(){
-  try{
-    const { data, error } = await sb.from('lead_comment_counts').select('*');
-    if(error){ console.warn('[counts]', error); return new Map(); }
-    const map = new Map();
-    (data||[]).forEach(r => map.set(r.lead_id, r.comments||0));
-    return map;
-  }catch(err){
-    console.warn('[counts: exception]', err);
-    return new Map();
-  }
+  const { data, error } = await sb.from('lead_comment_counts').select('*');
+  if(error) return new Map();
+  const map = new Map(); (data||[]).forEach(r=>map.set(r.lead_id, r.comments||0));
+  return map;
 }
 
 /* ===== DB: LEADS ===== */
 async function fetchLeads(){
   try{
-    // provo me created_at_ts (schema aktuale)
-    let { data, error } = await sb
+    const { data, error } = await sb
       .from('leads')
-      .select('id, created_at, created_at_ts, company, contact, phone, email, source, call_status, answer_outcome, next_follow_up, meeting_status, meeting_date, field_agent, nipt, industry, activity')
+      .select('id, created_at, created_at_ts, company, contact, phone, email, source, call_status, answer_outcome, next_follow_up, meeting_status, meeting_date, field_agent, nipt, industry, activity, created_by, created_by_email, assigned_to, assigned_to_email, assigned_at')
       .order('created_at_ts', { ascending:false });
     if(error) throw error;
     return data||[];
   }catch(err){
-    console.error('[fetchLeads]', err);
-    alert('Nuk u lexuan lead-et nga DB.\n' + (err.message || 'Kontrollo RLS/kolonat.'));
+    alert('Nuk u lexuan lead-et nga DB.');
     return [];
   }
 }
 
-/* ===== INSERT lead – payload strikt ===== */
+/* ===== INSERT / UPDATE ===== */
 async function insertLead(obj){
   const payload = {
     id: obj.id,
-    created_at: obj.created_at,           // DATE (YYYY-MM-DD)
+    created_at: obj.created_at,
     company: obj.company,
     phone: obj.phone,
     contact: obj.contact || null,
@@ -383,84 +409,50 @@ async function insertLead(obj){
     industry: obj.industry || null,
     activity: obj.activity || null
   };
-
   const { data, error } = await sb.from('leads').insert([payload]).select('id');
-  if(error){
-    console.error('[INSERT ERROR]', error);
-    alert('Shtimi në DB dështoi.\n' + (error.message || JSON.stringify(error)));
-    throw error;
-  }
+  if(error){ throw error; }
   return data;
 }
-
 async function updateLeadFields(id, fields){
   const { error } = await sb.from('leads').update(fields).eq('id', id);
-  if(error){
-    console.warn('[updateLeadFields]', error);
-    alert('UPDATE dështoi (RLS/kolonat).');
-  }
+  if(error){ throw error; }
 }
 
-/* ===== DB: UPDATES/COMMENTS ===== */
+/* ===== UPDATES/COMMENTS ===== */
 async function fetchComments(lead_id){
-  try{
-    const { data, error } = await sb.from('lead_updates').select('*').eq('lead_id', lead_id).order('ts',{ascending:false});
-    if(error){ console.warn('[fetchComments]', error); return []; }
-    return data||[];
-  }catch(err){
-    console.warn('[fetchComments exception]', err);
-    return [];
-  }
+  const { data, error } = await sb.from('lead_updates').select('*').eq('lead_id', lead_id).order('ts',{ascending:false});
+  return error ? [] : (data||[]);
 }
 async function insertUpdate(lead_id, payload){
-  try{
-    const row = Object.assign({ lead_id, kind:'update' }, payload);
-    const { error } = await sb.from('lead_updates').insert([row]);
-    if(error) throw error;
-  }catch(err){
-    console.warn('[insertUpdate]', err);
-    alert('Nuk u ruajt përditësimi (lead_updates).');
-  }
+  const row = Object.assign({ lead_id, kind:'update' }, payload);
+  const { error } = await sb.from('lead_updates').insert([row]);
+  if(error) throw error;
 }
 async function insertComment(lead_id, text){
-  try{
-    const { error } = await sb.from('lead_updates').insert([{ lead_id, kind:'comment', comment:text }]);
-    if(error) throw error;
-  }catch(err){
-    console.warn('[insertComment]', err);
-    alert('Nuk u ruajt komenti (lead_updates).');
-  }
+  const { error } = await sb.from('lead_updates').insert([{ lead_id, kind:'comment', comment:text }]);
+  if(error) throw error;
 }
 
 /* ===== BADGES ===== */
-function badgeCall(s){
-  if(s==='Answered') return `<span class="pill ok"><i class="fa-solid fa-phone"></i> ${s}</span>`;
-  if(s==='Not answered') return `<span class="pill warn"><i class="fa-solid fa-phone-slash"></i> ${s}</span>`;
-  if(s==='Invalid number') return `<span class="pill bad"><i class="fa-solid fa-triangle-exclamation"></i> ${s}</span>`;
-  return `<span class="pill">${ESC(s||'—')}</span>`;
-}
-function badgeResult(s){
-  if(!s) return `<span class="muted">—</span>`;
-  if(s==='I interesuar') return `<span class="pill ok"><i class="fa-solid fa-check"></i> ${s}</span>`;
-  if(s==='I pa interesuar') return `<span class="pill bad"><i class="fa-solid fa-xmark"></i> ${s}</span>`;
-  if(s==='Do ta eskaloj' || s==='Do të mendohet') return `<span class="pill warn"><i class="fa-solid fa-clock"></i> ${s}</span>`;
-  return `<span class="pill">${ESC(s)}</span>`;
-}
-function badgeMeeting(s){
-  if(s==='Accepted') return `<span class="pill ok"><i class="fa-solid fa-user-check"></i> ${s}</span>`;
-  if(s==='Pending') return `<span class="pill warn"><i class="fa-solid fa-hourglass-half"></i> ${s}</span>`;
-  if(s==='Refused - Closed') return `<span class="pill bad"><i class="fa-solid fa-circle-xmark"></i> ${s}</span>`;
-  return `<span class="pill">${ESC(s||'—')}</span>`;
-}
+function badgeCall(s){ if(s==='Answered')return`<span class="pill ok"><i class="fa-solid fa-phone"></i> ${s}</span>`;
+  if(s==='Not answered')return`<span class="pill warn"><i class="fa-solid fa-phone-slash"></i> ${s}</span>`;
+  if(s==='Invalid number')return`<span class="pill bad"><i class="fa-solid fa-triangle-exclamation"></i> ${s}</span>`;
+  return `<span class="pill">${ESC(s||'—')}</span>`;}
+function badgeResult(s){ if(!s)return`<span class="muted">—</span>`;
+  if(s==='I interesuar')return`<span class="pill ok"><i class="fa-solid fa-check"></i> ${s}</span>`;
+  if(s==='I pa interesuar')return`<span class="pill bad"><i class="fa-solid fa-xmark"></i> ${s}</span>`;
+  if(s==='Do ta eskaloj'||s==='Do të mendohet')return`<span class="pill warn"><i class="fa-solid fa-clock"></i> ${s}</span>`;
+  return `<span class="pill">${ESC(s)}</span>`;}
+function badgeMeeting(s){ if(s==='Accepted')return`<span class="pill ok"><i class="fa-solid fa-user-check"></i> ${s}</span>`;
+  if(s==='Pending')return`<span class="pill warn"><i class="fa-solid fa-hourglass-half"></i> ${s}</span>`;
+  if(s==='Refused - Closed')return`<span class="pill bad"><i class="fa-solid fa-circle-xmark"></i> ${s}</span>`;
+  return `<span class="pill">${ESC(s||'—')}</span>`;}
 
-/* ===== RENDER LIST ===== */
+/* ===== RENDER ===== */
 function render(){
   const q = EL('#q').value.toLowerCase().trim();
-  const fs = EL('#flt_source').value;
-  const fc = EL('#flt_call').value;
-  const fr = EL('#flt_result').value;
-  const fm = EL('#flt_meeting').value;
-  const sort = EL('#sortBy').value;
+  const fs = EL('#flt_source').value, fc = EL('#flt_call').value, fr = EL('#flt_result').value, fm = EL('#flt_meeting').value;
+  const onlyMine = EL('#flt_mine')?.checked; const sort = EL('#sortBy').value;
 
   let arr = LEADS.filter(x=>{
     const hay = (x.company+' '+(x.contact||'')+' '+(x.phone||'')+' '+(x.email||'')).toLowerCase();
@@ -469,7 +461,8 @@ function render(){
     const passC = !fc || x.call_status===fc;
     const passR = !fr || x.answer_outcome===fr;
     const passM = !fm || x.meeting_status===fm;
-    return passQ && passS && passC && passR && passM;
+    const passMine = !onlyMine || (x.created_by && CURRENT_PROFILE.id && x.created_by === CURRENT_PROFILE.id);
+    return passQ && passS && passC && passR && passM && passMine;
   });
 
   if(sort==='created_desc') arr.sort((a,b)=> (b.created_at_ts||b.created_at||'').localeCompare(a.created_at_ts||a.created_at||'')); 
@@ -478,15 +471,17 @@ function render(){
   else if(sort==='company_desc') arr.sort((a,b)=> (b.company||'').localeCompare(a.company||'')); 
   else if(sort==='next_desc') arr.sort((a,b)=> (a.next_follow_up||'9999-12-31').localeCompare(b.next_follow_up||'9999-12-31'));
 
-  EL('#stats').textContent = `${arr.length} lead(e) · total: ${LEADS.length}`;
+  EL('#stats').textContent = `${arr.length} lead(e) · total: ${LEADS.length}${EL('#flt_mine')?.checked ? ' · (vetëm tuat)':''}`;
 
   EL('#rows').innerHTML = arr.map(x=>{
     const due = x.next_follow_up && x.next_follow_up <= todayStr() ? `<span class="due">Due</span>` : '';
     const commentsCount = COUNTS.get(x.id) ?? 0;
+    const creator = x.created_by_email ? ` · <span class="muted">nga ${ESC(x.created_by_email)}</span>` : '';
+    const assigned = x.assigned_to_email ? `<br><span class="muted">caktuar: ${ESC(x.assigned_to_email)}</span>` : '';
     return `<tr>
       <td>
         <a href="#" onclick="openModal('${x.id}');return false;"><strong>${ESC(x.company)}</strong></a>
-        <br><span class="muted">${ESC((x.created_at||'').toString().slice(0,10))}</span>
+        <br><span class="muted">${ESC((x.created_at||'').toString().slice(0,10))}</span>${creator}${assigned}
       </td>
       <td>${ESC(x.contact||'')}<br><span class="muted">${ESC(x.phone||'')} ${x.email? ' · '+ESC(x.email):''}</span></td>
       <td><span class="tag">${ESC(x.source||'')}</span></td>
@@ -497,7 +492,7 @@ function render(){
       <td>${ESC(x.field_agent||'')}</td>
       <td><a href="#" onclick="openModal('${x.id}');return false;"><i class="fa-regular fa-comment-dots"></i> ${commentsCount}</a></td>
       <td class="nowrap">
-        <button class="btn" title="Follow-up +3 ditë" onclick="quickFollow('${x.id}')"><i class="fa-regular fa-bell"></i></button>
+        ${CAN_EDIT ? `<button class="btn" title="Follow-up +3 ditë" onclick="quickFollow('${x.id}')"><i class="fa-regular fa-bell"></i></button>` : ''}
         <button class="btn" title="Hap" onclick="openModal('${x.id}')"><i class="fa-regular fa-pen-to-square"></i></button>
       </td>
     </tr>`;
@@ -506,8 +501,9 @@ function render(){
 
 /* ===== ADD LEAD ===== */
 async function addLead(){
+  if(!CAN_EDIT){ alert('Nuk keni të drejtë të shtoni (viewer).'); return; }
   const obj = {
-    id: 'L'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),
+    id:'L'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),
     created_at: todayStr(),
     company: EL('#f_company').value.trim(),
     contact: EL('#f_contact').value.trim(),
@@ -525,11 +521,7 @@ async function addLead(){
     field_agent: EL('#f_field_agent').value.trim() || null,
     _prime_note: EL('#f_notes').value.trim() || null
   };
-
-  if(!obj.company || !obj.phone){
-    alert('Kompania dhe telefoni janë të detyrueshëm.');
-    return;
-  }
+  if(!obj.company || !obj.phone){ alert('Kompania dhe telefoni janë të detyrueshëm.'); return; }
   if(obj.answer_outcome==='Do ta eskaloj' || obj.answer_outcome==='Do të mendohet'){
     obj.next_follow_up = todayStr(addDays(new Date(),3));
   }
@@ -538,33 +530,36 @@ async function addLead(){
   EL('#loading').style.display='inline-flex';
   try{
     await insertLead(obj);
-
-    // log “create” (nëse kalon RLS)
-    try{
-      await sb.from('lead_updates').insert([{ lead_id: obj.id, kind: 'create', comment: obj._prime_note || null }]);
-    }catch(e){ console.warn('[lead_updates create] skipped:', e?.message || e); }
-
+    try{ await sb.from('lead_updates').insert([{ lead_id: obj.id, kind:'create', comment: obj._prime_note || null }]); }catch(e){}
     await refreshLeads();
-
-    // pastro formën
-    ['f_company','f_contact','f_phone','f_email','f_nipt','f_industry','f_activity','f_field_agent','f_meeting_date','f_notes']
-      .forEach(id=> EL('#'+id).value='');
-    EL('#f_source').value='QKB';
-    EL('#f_call_status').value='Not answered';
-    EL('#f_answer_outcome').value='';
-  }catch(err){
-    console.error('[addLead]', err);
-  }finally{
-    EL('#loading').style.display='none';
-  }
+    ['f_company','f_contact','f_phone','f_email','f_nipt','f_industry','f_activity','f_field_agent','f_meeting_date','f_notes'].forEach(id=> EL('#'+id).value='');
+    EL('#f_source').value='QKB'; EL('#f_call_status').value='Not answered'; EL('#f_answer_outcome').value='';
+  }finally{ EL('#loading').style.display='none'; }
 }
 
 /* ===== MODAL ===== */
+function populateAssigneeSelect(currentId){
+  const sel = EL('#m_assignee'); if(!sel) return;
+  sel.innerHTML = `<option value="">— asnjë —</option>` + 
+    ASSIGNABLE_USERS.map(u => `<option value="${u.id}">${ESC(u.full_name||u.email||u.id)}${u.role? ' · '+u.role:''}</option>`).join('');
+  sel.value = currentId || '';
+  const meta = EL('#m_assignee_meta');
+  if(meta){
+    const u = ASSIGNABLE_USERS.find(x=>x.id===currentId);
+    meta.textContent = u ? (u.email || '') : '';
+  }
+  sel.onchange = () => {
+    const u = ASSIGNABLE_USERS.find(x=>x.id===sel.value);
+    if(EL('#m_assignee_meta')) EL('#m_assignee_meta').textContent = u ? (u.email || '') : '';
+  };
+}
 async function openModal(id){
   CURRENT_ID = id;
   const x = LEADS.find(i=>i.id===id); if(!x) return;
   EL('#m_title').textContent = x.company;
-  EL('#m_meta').innerHTML = `${ESC(x.contact||'')} · <span class="muted">${ESC(x.phone||'')}</span> · <span class="muted">${ESC(x.email||'')}</span>`;
+  const creator = x.created_by_email ? ` · nga ${ESC(x.created_by_email)}` : '';
+  const assignee = x.assigned_to_email ? ` · caktuar: ${ESC(x.assigned_to_email)}` : '';
+  EL('#m_meta').innerHTML = `${ESC(x.contact||'')} · <span class="muted">${ESC(x.phone||'')}</span> · <span class="muted">${ESC(x.email||'')}</span>${creator}${assignee}`;
   EL('#m_nipt').value = x.nipt || '';
   EL('#m_industry').value = x.industry || '';
   EL('#m_activity').value = x.activity || '';
@@ -576,18 +571,27 @@ async function openModal(id){
   EL('#m_email').value = x.email || '';
   EL('#m_phone').value = x.phone || '';
   EL('#m_comment').value = '';
+  populateAssigneeSelect(x.assigned_to || '');
+
+  // lock për viewer
+  const ro = !CAN_EDIT;
+  ['#m_nipt','#m_industry','#m_activity','#m_result','#m_next','#m_meeting_status','#m_meeting_date','#m_agent','#m_email','#m_phone','#m_comment','#m_assignee']
+    .forEach(sel=>{ const el=EL(sel); if(el){ el.disabled = ro; el.readOnly = ro; }});
+  const saveBtn = document.querySelector('button.btn.ok[onclick="saveModal()"]');
+  if(saveBtn) saveBtn.style.display = ro ? 'none' : 'inline-flex';
 
   COMMENTS[id] = await fetchComments(id);
   renderTimeline(id);
-
   EL('#modal').style.display='flex';
 }
 function renderTimeline(id){
   const arr = COMMENTS[id] || [];
   const html = arr.map(c=>{
     const d = new Date(c.ts);
-    const meta = c.kind==='comment' ? 'Koment' : (c.kind==='create' ? 'Krijuar' : 'Përditësim');
+    const isAssign = c.kind==='assign';
+    const meta = (isAssign ? 'Caktim' : (c.kind==='comment' ? 'Koment' : (c.kind==='create' ? 'Krijuar' : 'Përditësim'))) + ` · nga ${ESC(c.actor_email||'—')}`;
     const details = [
+      isAssign && c.new_assignee_email ? `<div><strong>I caktuar te:</strong> ${ESC(c.new_assignee_email)}</div>` : '',
       c.comment ? `<div>${ESC(c.comment)}</div>` : '',
       c.new_result ? `<div><strong>Rezultat:</strong> ${ESC(c.new_result)}</div>` : '',
       c.next_follow_up ? `<div><strong>Follow-up:</strong> ${ESC(c.next_follow_up)}</div>` : '',
@@ -606,6 +610,7 @@ function closeModal(){ EL('#modal').style.display='none'; CURRENT_ID=null; }
 
 /* ===== SAVE & QUICK FOLLOW ===== */
 async function saveModal(){
+  if(!CAN_EDIT){ alert('Nuk keni të drejtë të ndryshoni (viewer).'); return; }
   const x = LEADS.find(i=>i.id===CURRENT_ID); if(!x) return;
 
   const newResult = EL('#m_result').value || null;
@@ -619,6 +624,10 @@ async function saveModal(){
   const industry = EL('#m_industry').value.trim() || null;
   const activity = EL('#m_activity').value.trim() || null;
   const comment = EL('#m_comment').value.trim();
+  const assigneeId = EL('#m_assignee').value || null;
+  const assigneeUser = ASSIGNABLE_USERS.find(u=>u.id===assigneeId) || null;
+  const assigneeEmail = assigneeUser?.email || null;
+  const assigneeChanged = (assigneeId || null) !== (x.assigned_to || null);
 
   const autoFU = (!nextFU && (newResult==='Do ta eskaloj' || newResult==='Do të mendohet')) ? todayStr(addDays(new Date(),3)) : null;
 
@@ -645,10 +654,30 @@ async function saveModal(){
       phone: phone,
       nipt: nipt,
       industry: industry,
-      activity: activity
+      activity: activity,
+      assigned_to: assigneeId,   // trigger-i plotëson email & logs 'assign'
     });
 
     await refreshLeads();
+
+    // (opsionale) thirr Edge Function për email-notification të caktimit
+    if(assigneeChanged && assigneeEmail){
+      try{
+        const { error } = await sb.functions.invoke('notify-lead-assignment', {
+          body: {
+            lead_id: x.id,
+            company: x.company,
+            assigned_to_email: assigneeEmail,
+            assigned_by_email: CURRENT_PROFILE.email,
+            contact: x.contact || '',
+            phone: phone || x.phone || '',
+            link: window.location.href
+          }
+        });
+        if(error) console.warn('[notify-lead-assignment]', error);
+      }catch(e){ console.warn('[invoke function]', e); }
+    }
+
     COMMENTS[x.id] = await fetchComments(x.id);
     renderTimeline(x.id);
   }catch(err){
@@ -659,6 +688,7 @@ async function saveModal(){
   }
 }
 async function quickFollow(id){
+  if(!CAN_EDIT){ alert('Nuk keni të drejtë të ndryshoni (viewer).'); return; }
   const x = LEADS.find(i=>i.id===id); if(!x) return;
   const next = todayStr(addDays(new Date(),3));
   EL('#loading').style.display='inline-flex';
@@ -666,12 +696,7 @@ async function quickFollow(id){
     await insertUpdate(id, { new_result: x.answer_outcome || null, next_follow_up: next });
     await updateLeadFields(id, { next_follow_up: next });
     await refreshLeads();
-  }catch(err){
-    console.error('[quickFollow]', err);
-    alert('S’përditësua follow-up.');
-  }finally{
-    EL('#loading').style.display='none';
-  }
+  }finally{ EL('#loading').style.display='none'; }
 }
 
 /* ===== EMAIL & ICS ===== */
@@ -727,10 +752,10 @@ function downloadICSMeeting(){
 
 /* ===== CSV ===== */
 function downloadCSV(){
-  const cols = ["id","created_at","company","nipt","industry","activity","contact","phone","email","source","call_status","answer_outcome","next_follow_up","meeting_status","meeting_date","field_agent"];
+  const cols = ["id","created_at","company","nipt","industry","activity","contact","phone","email","source","call_status","answer_outcome","next_follow_up","meeting_status","meeting_date","field_agent","created_by_email","assigned_to_email"];
   const lines = [cols.join(',')];
   LEADS.forEach(x=>{
-    const row = [x.id,x.created_at,x.company,x.nipt||'',x.industry||'',x.activity||'',x.contact||'',x.phone||'',x.email||'',x.source||'',x.call_status||'',x.answer_outcome||'',x.next_follow_up||'',x.meeting_status||'',x.meeting_date||'',x.field_agent||'']
+    const row = [x.id,x.created_at,x.company,x.nipt||'',x.industry||'',x.activity||'',x.contact||'',x.phone||'',x.email||'',x.source||'',x.call_status||'',x.answer_outcome||'',x.next_follow_up||'',x.meeting_status||'',x.meeting_date||'',x.field_agent||'',x.created_by_email||'',x.assigned_to_email||'']
       .map(v => `"${String(v??'').replace(/"/g,'""')}"`);
     lines.push(row.join(','));
   });
@@ -746,17 +771,11 @@ async function refreshLeads(){
     LEADS = Array.isArray(leads) ? leads : [];
     COUNTS = counts instanceof Map ? counts : new Map();
     render();
-  }catch(err){
-    console.error('[refreshLeads]', err);
-    alert('Gabim gjatë rifreskimit të të dhënave.');
-  }finally{
-    EL('#loading').style.display='none';
-  }
+  }finally{ EL('#loading').style.display='none'; }
 }
 
 /* ===== INIT ===== */
 document.addEventListener('DOMContentLoaded', async ()=>{
-  // Heq fragment auth (#access_token=...) nëse Supabase kthen diçka në URL
   if (window.location.hash && window.location.hash.includes('access_token')) {
     history.replaceState({}, document.title, window.location.pathname + window.location.search);
   }
