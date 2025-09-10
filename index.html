@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
+
 <style>
   :root{
     --brand:#2563eb; --brand-2:#1d4ed8; --ok:#16a34a; --warn:#d97706; --bad:#b91c1c;
@@ -57,7 +58,6 @@
   .table-scroll{width:100%; overflow:auto}
   .hide{display:none}
   #loading{display:none; align-items:center; gap:8px; font-weight:800}
-  #role_badge{font-size:11px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); background:#eef2ff; color:#1d4ed8}
 
   /* Overlay Auth */
   #auth{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.06);backdrop-filter:blur(4px);z-index:9999}
@@ -71,7 +71,6 @@
   .flex{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
   .right{display:flex; gap:8px; justify-content:flex-end}
   .nowrap{white-space:nowrap}
-  .disabled{opacity:.6; pointer-events:none}
 </style>
 </head>
 <body>
@@ -82,7 +81,6 @@
       <div class="muted">Kërkon login · Shfaqet për këdo të loguar</div>
     </div>
     <div class="toolbar">
-      <span id="role_badge" class="hide"></span>
       <div id="loading" class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Duke ngarkuar…</div>
       <button class="btn" onclick="refreshLeads()"><i class="fa-solid fa-rotate"></i> Rifresko</button>
       <button class="btn" onclick="downloadCSV()"><i class="fa-solid fa-file-export"></i> Eksport CSV</button>
@@ -137,9 +135,7 @@
       </div>
 
       <div><label>Shënime</label><textarea id="f_notes" placeholder="Shënim fillestar (ruhet si koment ‘create’)"></textarea></div>
-      <div class="right">
-        <button id="btn_add" class="btn primary" onclick="addLead()"><i class="fa-solid fa-plus"></i> Shto lead</button>
-      </div>
+      <div class="right"><button class="btn primary" onclick="addLead()"><i class="fa-solid fa-plus"></i> Shto lead</button></div>
     </div>
   </section>
 
@@ -237,7 +233,7 @@
           <button class="btn" onclick="sendEmailTemplate()"><i class="fa-solid fa-envelope"></i> Dërgo email</button>
           <button class="btn" onclick="downloadICSFollowup()"><i class="fa-regular fa-calendar-plus"></i> .ics Follow-up</button>
           <button class="btn" onclick="downloadICSMeeting()"><i class="fa-regular fa-calendar"></i> .ics Takim</button>
-          <button id="btn_save" class="btn ok" onclick="saveModal()"><i class="fa-solid fa-floppy-disk"></i> Ruaj</button>
+          <button class="btn ok" onclick="saveModal()"><i class="fa-solid fa-floppy-disk"></i> Ruaj</button>
         </div>
 
         <div>
@@ -268,18 +264,19 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ===== SUPABASE ===== */
-const SUPABASE_URL = 'https://cpkyagcuowjvofgcgdwx.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNwa3lhZ2N1b3dqdm9mZ2NnZHd4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY4MjI3OTksImV4cCI6MjA3MjM5ODc5OX0.NqgKif1QO3vtigZ9eWRc8JuJLCw6JoeRIcqWwzXCIQs';
+const SUPABASE_URL = 'https://xsdcprmwthmqzorojykl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzZGNwcm13dGhtcXpvcm9qeWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NDU2ODUsImV4cCI6MjA3MzAyMTY4NX0.xql-MTN1szGVtdJkMmGxYRZ4mXNJ1a2vSXV2Fb1o4fw';
+
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
 });
+console.log('[Supabase]', SUPABASE_URL);
 
 /* ===== STATE/UTIL ===== */
 let LEADS = [];
 let COMMENTS = {};
 let COUNTS = new Map();
 let CURRENT_ID = null;
-let CURRENT_ROLE = 'viewer'; // default derisa të lexohet profili
 const EL = sel => document.querySelector(sel);
 const ESC = s => (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
 function todayStr(d=new Date()){ const z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
@@ -290,34 +287,11 @@ async function updateHeaderUser(session){
   const slot = EL('#user_slot');
   if(slot) slot.textContent = session?.user?.email ? ('• '+session.user.email) : '';
 }
-async function fetchMyProfile(){
-  const { data, error } = await sb.from('profiles').select('role,email').eq('id',(await sb.auth.getUser()).data.user.id).single();
-  if(!error && data){ CURRENT_ROLE = data.role || 'viewer'; } else { CURRENT_ROLE = 'viewer'; }
-  const badge = EL('#role_badge');
-  if(badge){ badge.textContent = 'Role: '+CURRENT_ROLE; badge.classList.remove('hide'); }
-  toggleUIForRole();
-}
-function toggleUIForRole(){
-  const canEdit = (CURRENT_ROLE === 'editor' || CURRENT_ROLE === 'admin');
-  // form add
-  ['f_company','f_contact','f_phone','f_email','f_nipt','f_industry','f_activity','f_field_agent','f_meeting_date','f_notes','f_source','f_call_status','f_answer_outcome']
-    .forEach(id => { const el=EL('#'+id); if(el) el.disabled = !canEdit; });
-  const btnAdd = EL('#btn_add'); if(btnAdd) btnAdd.classList.toggle('disabled', !canEdit);
-
-  // modal controls
-  ['m_nipt','m_industry','m_activity','m_result','m_next','m_meeting_status','m_meeting_date','m_agent','m_email','m_phone','m_comment']
-    .forEach(id => { const el=EL('#'+id); if(el) el.disabled = !canEdit; });
-  const btnSave = EL('#btn_save'); if(btnSave) btnSave.classList.toggle('disabled', !canEdit);
-
-  // action buttons in list (render() do të kontrollojë përsëri)
-  render();
-}
 async function requireSession(){
   const { data: { session } } = await sb.auth.getSession();
   if(session){
     EL('#auth').style.display='none';
     await updateHeaderUser(session);
-    await fetchMyProfile();
     return true;
   }else{
     EL('#auth').style.display='flex';
@@ -333,7 +307,6 @@ async function signIn(){
     EL('#auth').style.display='none';
     const { data:{ session } } = await sb.auth.getSession();
     await updateHeaderUser(session);
-    await fetchMyProfile();
     await refreshLeads();
   }
 }
@@ -347,14 +320,12 @@ async function signOut(){
   await sb.auth.signOut();
   LEADS = []; COMMENTS = {}; COUNTS = new Map(); render();
   EL('#user_slot').textContent = '';
-  EL('#role_badge').classList.add('hide');
   EL('#auth').style.display='flex';
 }
 sb.auth.onAuthStateChange(async (_evt, session) => {
   if(session){
     EL('#auth').style.display='none';
     await updateHeaderUser(session);
-    await fetchMyProfile();
     await refreshLeads();
   }else{
     EL('#auth').style.display='flex';
@@ -378,12 +349,13 @@ async function fetchCounts(){
 /* ===== DB: LEADS ===== */
 async function fetchLeads(){
   try{
+    // provo me created_at_ts (schema aktuale)
     let { data, error } = await sb
       .from('leads')
       .select('id, created_at, created_at_ts, company, contact, phone, email, source, call_status, answer_outcome, next_follow_up, meeting_status, meeting_date, field_agent, nipt, industry, activity')
       .order('created_at_ts', { ascending:false });
     if(error) throw error;
-    return (data||[]);
+    return data||[];
   }catch(err){
     console.error('[fetchLeads]', err);
     alert('Nuk u lexuan lead-et nga DB.\n' + (err.message || 'Kontrollo RLS/kolonat.'));
@@ -395,7 +367,7 @@ async function fetchLeads(){
 async function insertLead(obj){
   const payload = {
     id: obj.id,
-    created_at: obj.created_at,
+    created_at: obj.created_at,           // DATE (YYYY-MM-DD)
     company: obj.company,
     phone: obj.phone,
     contact: obj.contact || null,
@@ -411,6 +383,7 @@ async function insertLead(obj){
     industry: obj.industry || null,
     activity: obj.activity || null
   };
+
   const { data, error } = await sb.from('leads').insert([payload]).select('id');
   if(error){
     console.error('[INSERT ERROR]', error);
@@ -419,18 +392,19 @@ async function insertLead(obj){
   }
   return data;
 }
+
 async function updateLeadFields(id, fields){
   const { error } = await sb.from('leads').update(fields).eq('id', id);
-  if(error){ console.warn('[updateLeadFields]', error); alert('UPDATE dështoi (RLS/kolonat).'); }
+  if(error){
+    console.warn('[updateLeadFields]', error);
+    alert('UPDATE dështoi (RLS/kolonat).');
+  }
 }
 
 /* ===== DB: UPDATES/COMMENTS ===== */
 async function fetchComments(lead_id){
   try{
-    const { data, error } = await sb.from('lead_updates')
-      .select('id, ts, kind, comment, new_result, next_follow_up, meeting_status, meeting_date, field_agent, email, actor_email')
-      .eq('lead_id', lead_id)
-      .order('ts',{ascending:false});
+    const { data, error } = await sb.from('lead_updates').select('*').eq('lead_id', lead_id).order('ts',{ascending:false});
     if(error){ console.warn('[fetchComments]', error); return []; }
     return data||[];
   }catch(err){
@@ -481,13 +455,12 @@ function badgeMeeting(s){
 
 /* ===== RENDER LIST ===== */
 function render(){
-  const q = EL('#q')?.value?.toLowerCase().trim() || '';
-  const fs = EL('#flt_source')?.value || '';
-  const fc = EL('#flt_call')?.value || '';
-  const fr = EL('#flt_result')?.value || '';
-  const fm = EL('#flt_meeting')?.value || '';
-  const sort = EL('#sortBy')?.value || 'created_desc';
-  const canEdit = (CURRENT_ROLE === 'editor' || CURRENT_ROLE === 'admin');
+  const q = EL('#q').value.toLowerCase().trim();
+  const fs = EL('#flt_source').value;
+  const fc = EL('#flt_call').value;
+  const fr = EL('#flt_result').value;
+  const fm = EL('#flt_meeting').value;
+  const sort = EL('#sortBy').value;
 
   let arr = LEADS.filter(x=>{
     const hay = (x.company+' '+(x.contact||'')+' '+(x.phone||'')+' '+(x.email||'')).toLowerCase();
@@ -499,21 +472,17 @@ function render(){
     return passQ && passS && passC && passR && passM;
   });
 
-  if(sort==='created_desc') arr.sort((a,b)=> (b.created_at_ts||b.created_at||'').localeCompare(a.created_at_ts||a.created_at||''));
+  if(sort==='created_desc') arr.sort((a,b)=> (b.created_at_ts||b.created_at||'').localeCompare(a.created_at_ts||a.created_at||'')); 
   else if(sort==='created_asc') arr.sort((a,b)=> (a.created_at_ts||a.created_at||'').localeCompare(b.created_at_ts||b.created_at||'')); 
   else if(sort==='company_asc') arr.sort((a,b)=> (a.company||'').localeCompare(b.company||'')); 
   else if(sort==='company_desc') arr.sort((a,b)=> (b.company||'').localeCompare(a.company||'')); 
   else if(sort==='next_desc') arr.sort((a,b)=> (a.next_follow_up||'9999-12-31').localeCompare(b.next_follow_up||'9999-12-31'));
 
-  EL('#stats').textContent = `${arr.length} lead(e) · total: ${LEADS.length} · roli: ${CURRENT_ROLE}`;
+  EL('#stats').textContent = `${arr.length} lead(e) · total: ${LEADS.length}`;
 
   EL('#rows').innerHTML = arr.map(x=>{
     const due = x.next_follow_up && x.next_follow_up <= todayStr() ? `<span class="due">Due</span>` : '';
     const commentsCount = COUNTS.get(x.id) ?? 0;
-    const actions = canEdit
-      ? `<button class="btn" title="Follow-up +3 ditë" onclick="quickFollow('${x.id}')"><i class="fa-regular fa-bell"></i></button>
-         <button class="btn" title="Hap" onclick="openModal('${x.id}')"><i class="fa-regular fa-pen-to-square"></i></button>`
-      : `<button class="btn" title="Shiko" onclick="openModal('${x.id}')"><i class="fa-regular fa-eye"></i></button>`;
     return `<tr>
       <td>
         <a href="#" onclick="openModal('${x.id}');return false;"><strong>${ESC(x.company)}</strong></a>
@@ -527,16 +496,16 @@ function render(){
       <td>${badgeMeeting(x.meeting_status)}<br><span class="muted">${x.meeting_date||''}</span></td>
       <td>${ESC(x.field_agent||'')}</td>
       <td><a href="#" onclick="openModal('${x.id}');return false;"><i class="fa-regular fa-comment-dots"></i> ${commentsCount}</a></td>
-      <td class="nowrap">${actions}</td>
+      <td class="nowrap">
+        <button class="btn" title="Follow-up +3 ditë" onclick="quickFollow('${x.id}')"><i class="fa-regular fa-bell"></i></button>
+        <button class="btn" title="Hap" onclick="openModal('${x.id}')"><i class="fa-regular fa-pen-to-square"></i></button>
+      </td>
     </tr>`;
   }).join('') || `<tr><td colspan="10" class="muted">S'ka të dhëna.</td></tr>`;
 }
 
 /* ===== ADD LEAD ===== */
 async function addLead(){
-  const canEdit = (CURRENT_ROLE === 'editor' || CURRENT_ROLE === 'admin');
-  if(!canEdit){ alert('Nuk ke të drejta për të shtuar (viewer).'); return; }
-
   const obj = {
     id: 'L'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),
     created_at: todayStr(),
@@ -556,8 +525,10 @@ async function addLead(){
     field_agent: EL('#f_field_agent').value.trim() || null,
     _prime_note: EL('#f_notes').value.trim() || null
   };
+
   if(!obj.company || !obj.phone){
-    alert('Kompania dhe telefoni janë të detyrueshëm.'); return;
+    alert('Kompania dhe telefoni janë të detyrueshëm.');
+    return;
   }
   if(obj.answer_outcome==='Do ta eskaloj' || obj.answer_outcome==='Do të mendohet'){
     obj.next_follow_up = todayStr(addDays(new Date(),3));
@@ -570,11 +541,7 @@ async function addLead(){
 
     // log “create” (nëse kalon RLS)
     try{
-      await sb.from('lead_updates').insert([{
-        lead_id: obj.id,
-        kind: 'create',
-        comment: obj._prime_note || null
-      }]);
+      await sb.from('lead_updates').insert([{ lead_id: obj.id, kind: 'create', comment: obj._prime_note || null }]);
     }catch(e){ console.warn('[lead_updates create] skipped:', e?.message || e); }
 
     await refreshLeads();
@@ -613,16 +580,13 @@ async function openModal(id){
   COMMENTS[id] = await fetchComments(id);
   renderTimeline(id);
 
-  // rolet
-  toggleUIForRole();
   EL('#modal').style.display='flex';
 }
 function renderTimeline(id){
   const arr = COMMENTS[id] || [];
   const html = arr.map(c=>{
     const d = new Date(c.ts);
-    const metaKind = c.kind==='comment' ? 'Koment' : (c.kind==='create' ? 'Krijuar' : 'Përditësim');
-    const actor = c.actor_email ? ` · <span class="muted">${ESC(c.actor_email)}</span>` : '';
+    const meta = c.kind==='comment' ? 'Koment' : (c.kind==='create' ? 'Krijuar' : 'Përditësim');
     const details = [
       c.comment ? `<div>${ESC(c.comment)}</div>` : '',
       c.new_result ? `<div><strong>Rezultat:</strong> ${ESC(c.new_result)}</div>` : '',
@@ -632,7 +596,7 @@ function renderTimeline(id){
       c.email ? `<div><strong>Email:</strong> ${ESC(c.email)}</div>` : ''
     ].filter(Boolean).join('');
     return `<div class="card" style="padding:10px">
-      <div class="muted">${metaKind} · ${d.toLocaleString()}${actor}</div>
+      <div class="muted">${meta} · ${d.toLocaleString()}</div>
       <div>${details || '<em class="muted">—</em>'}</div>
     </div>`;
   }).join('');
@@ -642,10 +606,8 @@ function closeModal(){ EL('#modal').style.display='none'; CURRENT_ID=null; }
 
 /* ===== SAVE & QUICK FOLLOW ===== */
 async function saveModal(){
-  const canEdit = (CURRENT_ROLE === 'editor' || CURRENT_ROLE === 'admin');
-  if(!canEdit){ alert('Nuk ke të drejta për të ruajtur (viewer).'); return; }
-
   const x = LEADS.find(i=>i.id===CURRENT_ID); if(!x) return;
+
   const newResult = EL('#m_result').value || null;
   const nextFU = EL('#m_next').value || null;
   const mStatus = EL('#m_meeting_status').value || null;
@@ -657,6 +619,7 @@ async function saveModal(){
   const industry = EL('#m_industry').value.trim() || null;
   const activity = EL('#m_activity').value.trim() || null;
   const comment = EL('#m_comment').value.trim();
+
   const autoFU = (!nextFU && (newResult==='Do ta eskaloj' || newResult==='Do të mendohet')) ? todayStr(addDays(new Date(),3)) : null;
 
   EL('#loading').style.display='inline-flex';
@@ -682,8 +645,7 @@ async function saveModal(){
       phone: phone,
       nipt: nipt,
       industry: industry,
-      activity: activity,
-      updated_by: (await sb.auth.getUser()).data.user.id
+      activity: activity
     });
 
     await refreshLeads();
@@ -697,15 +659,12 @@ async function saveModal(){
   }
 }
 async function quickFollow(id){
-  const canEdit = (CURRENT_ROLE === 'editor' || CURRENT_ROLE === 'admin');
-  if(!canEdit){ alert('Nuk ke të drejta për follow-up (viewer).'); return; }
-
   const x = LEADS.find(i=>i.id===id); if(!x) return;
   const next = todayStr(addDays(new Date(),3));
   EL('#loading').style.display='inline-flex';
   try{
     await insertUpdate(id, { new_result: x.answer_outcome || null, next_follow_up: next });
-    await updateLeadFields(id, { next_follow_up: next, updated_by: (await sb.auth.getUser()).data.user.id });
+    await updateLeadFields(id, { next_follow_up: next });
     await refreshLeads();
   }catch(err){
     console.error('[quickFollow]', err);
@@ -797,6 +756,7 @@ async function refreshLeads(){
 
 /* ===== INIT ===== */
 document.addEventListener('DOMContentLoaded', async ()=>{
+  // Heq fragment auth (#access_token=...) nëse Supabase kthen diçka në URL
   if (window.location.hash && window.location.hash.includes('access_token')) {
     history.replaceState({}, document.title, window.location.pathname + window.location.search);
   }
