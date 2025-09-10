@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"/>
-
 <style>
   :root{
     --brand:#2563eb; --brand-2:#1d4ed8; --ok:#16a34a; --warn:#d97706; --bad:#b91c1c;
@@ -284,8 +283,8 @@ const SUPABASE_URL = 'https://xsdcprmwthmqzorojykl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzZGNwcm13dGhtcXpvcm9qeWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NDU2ODUsImV4cCI6MjA3MzAyMTY4NX0.xql-MTN1szGVtdJkMmGxYRZ4mXNJ1a2vSXV2Fb1o4fw';
 
 /** Opsionale: nëse ke një webhook (Make/Zapier/Server) për email-notifications, vendose këtu.
- *  Nëse lihet bosh, bëhet fallback në mailto: */
-const WEBHOOK_URL = ''; // p.sh. 'https://hooks.zapier.com/....'
+ * Nëse lihet bosh, bëhet fallback në mailto: */
+const WEBHOOK_URL = ''; // p.sh. 'https://hooks.zapier.com/...'
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
@@ -298,7 +297,7 @@ let COMMENTS = {};
 let COUNTS = new Map();
 let CURRENT_ID = null;
 let PROFILES = []; // {id, email, full_name, role}
-let SELF = null;   // {id, email}
+let SELF = null; // {id, email}
 const EL = sel => document.querySelector(sel);
 const ESC = s => (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
 function todayStr(d=new Date()){ const z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
@@ -318,45 +317,64 @@ async function updateHeaderUser(session){
   }
 }
 async function requireSession(){
-  const { data: { session } } = await sb.auth.getSession();
-  if(session){
-    EL('#auth').style.display='none';
-    await updateHeaderUser(session);
-    return true;
-  }else{
+  try{
+    const { data: { session } } = await sb.auth.getSession();
+    if(session){
+      // verifiko user-in real – nëse bie, bëj signOut
+      const { data: userData, error } = await sb.auth.getUser();
+      if(error || !userData?.user){ await signOut(); return false; }
+      EL('#auth').style.display='none';
+      await updateHeaderUser(session);
+      return true;
+    }else{
+      EL('#auth').style.display='flex';
+      return false;
+    }
+  }catch(e){
+    console.warn('[requireSession]', e);
     EL('#auth').style.display='flex';
     return false;
-  }
+  }finally{ off(); }
 }
 async function signIn(){
+  on();
   const email = EL('#auth_email').value.trim();
   const password = EL('#auth_pwd').value;
   const { error } = await sb.auth.signInWithPassword({ email, password });
   EL('#auth_msg').textContent = error ? (error.message || 'Login dështoi') : '';
   if(!error){
-    // fshi fragmentet e supabase (#access_token=...)
     if (location.hash.includes('access_token')) history.replaceState({}, document.title, location.pathname + location.search);
     EL('#auth').style.display='none';
     const { data:{ session } } = await sb.auth.getSession();
     await updateHeaderUser(session);
     await bootstrap();
   }
+  off();
 }
 async function signUp(){
+  on();
   const email = EL('#auth_email').value.trim();
   const password = EL('#auth_pwd').value;
   const { error } = await sb.auth.signUp({ email, password });
   EL('#auth_msg').textContent = error ? (error.message || 'Sign up dështoi') : 'U krijua. Kontrollo email-in (nëse kërkohet verifikim).';
+  off();
 }
 async function signOut(){
-  await sb.auth.signOut();
+  on();
+  try{ await sb.auth.signOut(); }catch{}
   LEADS = []; COMMENTS = {}; COUNTS = new Map(); PROFILES = []; render();
   EL('#user_slot').textContent = '';
   EL('#auth').style.display='flex';
+  off();
 }
 sb.auth.onAuthStateChange(async (_evt, session) => {
-  if(session){ EL('#auth').style.display='none'; await updateHeaderUser(session); await bootstrap(); }
-  else{ EL('#auth').style.display='flex'; }
+  if(session){
+    EL('#auth').style.display='none';
+    await updateHeaderUser(session);
+    await bootstrap();
+  }else{
+    EL('#auth').style.display='flex';
+  }
 });
 
 /* ===== DB: PROFILES ===== */
@@ -396,7 +414,7 @@ async function fetchLeads(){
   }
 }
 
-/* ===== INSERT lead ===== */
+/* ===== INSERT / UPDATE ===== */
 async function insertLead(obj){
   const payload = {
     id: obj.id,
@@ -413,6 +431,8 @@ async function insertLead(obj){
   return data;
 }
 async function updateLeadFields(id, fields){
+  // shëno edhe updated_by
+  fields = Object.assign({}, fields, { updated_by: SELF?.id || null });
   const { error } = await sb.from('leads').update(fields).eq('id', id);
   if(error){ console.warn('[updateLeadFields]', error); alert('UPDATE dështoi (RLS/kolonat).'); }
 }
@@ -616,7 +636,9 @@ function renderTimeline(id){
   const html = arr.map(c=>{
     const d = new Date(c.ts);
     const meta = c.kind==='comment' ? 'Koment' : (c.kind==='create' ? 'Krijuar' : 'Përditësim');
+    const who = c.actor_email || (PROFILES.find(p=>p.id===c.actor_id)?.email) || '—';
     const details = [
+      `<div class="muted">${meta} nga ${ESC(who)} · ${d.toLocaleString()}</div>`,
       c.comment ? `<div>${ESC(c.comment)}</div>` : '',
       c.new_result ? `<div><strong>Rezultat:</strong> ${ESC(c.new_result)}</div>` : '',
       c.next_follow_up ? `<div><strong>Follow-up:</strong> ${ESC(c.next_follow_up)}</div>` : '',
@@ -624,10 +646,7 @@ function renderTimeline(id){
       c.field_agent ? `<div><strong>Agjent:</strong> ${ESC(c.field_agent)}</div>` : '',
       c.email ? `<div><strong>Email:</strong> ${ESC(c.email)}</div>` : ''
     ].filter(Boolean).join('');
-    return `<div class="card" style="padding:10px">
-      <div class="muted">${meta} · ${d.toLocaleString()}</div>
-      <div>${details || '<em class="muted">—</em>'}</div>
-    </div>`;
+    return `<div class="card" style="padding:10px">${details || '<em class="muted">—</em>'}</div>`;
   }).join('');
   EL('#m_timeline').innerHTML = html || `<div class="muted">S’ka komente ende.</div>`;
 }
@@ -711,18 +730,14 @@ async function assignLead(){
 
   on();
   try{
-    // 1) update në leads
     await updateLeadFields(x.id, { assigned_to: assignee });
 
-    // 2) shënim në timeline
     const assigneeEmail = (PROFILES.find(p=>p.id===assignee)?.email)||'';
     await insertUpdate(x.id, { comment: `Assigned to ${assigneeEmail}`, new_result: x.answer_outcome||null });
 
-    // 3) njoftim email
     await notifyAssignee({ lead: x, assigneeId: assignee, assigneeEmail });
 
     await refreshLeads();
-    // rifresko audit section
     openModal(x.id);
   }catch(err){
     console.error('[assignLead]', err);
@@ -758,7 +773,6 @@ Ju lutem ndiqeni rastin në Mini-CRM.`;
         })
       });
     }else{
-      // fallback: mailto
       const mailto = `mailto:${encodeURIComponent(assigneeEmail)}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
       window.open(mailto, '_blank');
     }
@@ -857,12 +871,12 @@ async function bootstrap(){
 
 /* ===== INIT ===== */
 document.addEventListener('DOMContentLoaded', async ()=>{
-  // Hiq fragment auth (#access_token=...) nëse Supabase kthen diçka në URL
   if (window.location.hash && window.location.hash.includes('access_token')) {
     history.replaceState({}, document.title, window.location.pathname + window.location.search);
   }
+  on();
   const ok = await requireSession();
-  if(ok){ await bootstrap(); }
+  if(ok){ await bootstrap(); } else { off(); }
 });
 </script>
 </body>
