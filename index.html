@@ -32,7 +32,7 @@
   .two{grid-template-columns:1fr}
   .card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px}
   label{font-weight:800; font-size:12px; color:var(--muted)}
-  input,select,textarea{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2')}
+  input,select,textarea{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:10px; background:var(--surface-2)}
   textarea{min-height:80px}
   .row{display:grid; grid-template-columns:repeat(4,1fr); gap:10px}
   .row-3{display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
@@ -44,6 +44,7 @@
   .btn.warn{background:linear-gradient(180deg,var(--warn),#b45309); color:#fff; border-color:transparent}
   .btn.bad{background:linear-gradient(180deg,var(--bad),#7f1d1d); color:#fff; border-color:transparent}
   .toolbar{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  .muted{color:var(--muted); font-size:12px}
   table{width:100%; border-collapse:separate; border-spacing:0}
   th,td{padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; font-size:14px}
   th{font-size:12px; color:var(--muted)}
@@ -52,19 +53,12 @@
   .pill.ok{background:#dcfce7; color:#166534}
   .pill.bad{background:#fee2e2; color:#7f1d1d}
   .pill.warn{background:#fff7ed; color:#92400e}
-  .muted{color:var(--muted); font-size:12px}
   .tag{display:inline-block; padding:2px 6px; border-radius:999px; border:1px solid var(--line); font-size:11px; background:#f1f5f9}
   .due{color:#fff; background:#ef4444; padding:2px 6px; border-radius:8px; font-weight:800; font-size:11px}
   .table-scroll{width:100%; overflow:auto}
-  .hide{display:none}
   #loading{display:none; align-items:center; gap:8px; font-weight:800}
-  .role{border:1px solid var(--line); border-radius:999px; padding:2px 8px; font-size:11px; margin-left:6px; background:#f1f5f9}
-
-  /* Overlay Auth */
   #auth{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.06);backdrop-filter:blur(4px);z-index:9999}
   #auth .panel{width:360px;max-width:94%;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px}
-
-  /* Modal */
   .modal{position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:center; justify-content:center; padding:18px; z-index:1000}
   .panel{max-width:900px; width:100%; background:var(--surface); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); display:flex; flex-direction:column; max-height:90vh}
   .panel .head{position:sticky; top:0; background:var(--surface); border-bottom:1px solid var(--line); padding:14px; display:flex; align-items:center; justify-content:space-between; gap:8px; z-index:1}
@@ -85,7 +79,6 @@
       <div id="loading" class="muted"><i class="fa-solid fa-spinner fa-spin"></i> Duke ngarkuar…</div>
       <button class="btn" onclick="refreshLeads()"><i class="fa-solid fa-rotate"></i> Rifresko</button>
       <button class="btn" onclick="downloadCSV()"><i class="fa-solid fa-file-export"></i> Eksport CSV</button>
-      <label class="btn"><input id="onlyMine" type="checkbox" onchange="render()"> Vetëm të miat</label>
       <span id="user_slot" class="muted"></span>
       <button class="btn" onclick="signOut()"><i class="fa-solid fa-right-from-bracket"></i> Dil</button>
     </div>
@@ -137,7 +130,7 @@
       </div>
 
       <div><label>Shënime</label><textarea id="f_notes" placeholder="Shënim fillestar (ruhet si koment ‘create’)"></textarea></div>
-      <div class="right"><button id="btn_add" class="btn primary" onclick="addLead()"><i class="fa-solid fa-plus"></i> Shto lead</button></div>
+      <div class="right"><button class="btn primary" onclick="addLead()"><i class="fa-solid fa-plus"></i> Shto lead</button></div>
     </div>
   </section>
 
@@ -159,6 +152,11 @@
         <select id="flt_meeting" onchange="render()">
           <option value="">Takim (gjithë)</option><option>Pending</option><option>Accepted</option><option>Refused - Closed</option>
         </select>
+        <select id="flt_mine" onchange="render()">
+          <option value="">Të gjithë lead-et</option>
+          <option value="mine">Vetëm lead-et e mia</option>
+          <option value="assigned">Vetëm të caktuar mua</option>
+        </select>
         <label class="btn"><i class="fa-solid fa-sort"></i>
           <select id="sortBy" onchange="render()" style="border:0;background:transparent">
             <option value="created_desc">Më të rejat</option>
@@ -178,7 +176,7 @@
         <thead>
           <tr>
             <th>Kompania</th><th>Kontakt</th><th>Burimi</th><th>Tel status</th><th>Rezultat</th>
-            <th>Follow-up</th><th>Takimi</th><th>Agjenti</th><th>Assigned</th><th>Komente</th><th class="nowrap">Veprime</th>
+            <th>Follow-up</th><th>Takimi</th><th>Agjenti</th><th>Komente</th><th class="nowrap">Veprime</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
@@ -191,8 +189,14 @@
 <div class="modal" id="modal">
   <div class="panel">
     <div class="head">
-      <div><h3 id="m_title" style="margin:0"></h3><div class="muted" id="m_meta"></div></div>
-      <div class="flex"><button class="btn" onclick="closeModal()">Mbyll</button></div>
+      <div>
+        <h3 id="m_title" style="margin:0"></h3>
+        <div class="muted" id="m_meta"></div>
+        <div class="muted" id="m_audit" style="margin-top:4px"></div>
+      </div>
+      <div class="flex">
+        <button class="btn" onclick="closeModal()">Mbyll</button>
+      </div>
     </div>
 
     <div class="body">
@@ -231,20 +235,21 @@
 
         <div class="row-2">
           <div>
-            <label>Assigned to</label>
-            <select id="m_assigned_to"></select>
+            <label>Asignoje te përdoruesi</label>
+            <select id="m_assign_to"></select>
           </div>
-          <div>
-            <label>Koment i ri</label>
-            <textarea id="m_comment" placeholder="Përshkrim i telefonatës / takimit / follow-up / caktim"></textarea>
+          <div style="align-self:end">
+            <button class="btn" onclick="assignLead()"><i class="fa-solid fa-user-plus"></i> Asigno</button>
           </div>
         </div>
+
+        <div><label>Koment i ri</label><textarea id="m_comment" placeholder="Përshkrim i telefonatës / takimit / follow-up"></textarea></div>
 
         <div class="flex right">
           <button class="btn" onclick="sendEmailTemplate()"><i class="fa-solid fa-envelope"></i> Dërgo email</button>
           <button class="btn" onclick="downloadICSFollowup()"><i class="fa-regular fa-calendar-plus"></i> .ics Follow-up</button>
           <button class="btn" onclick="downloadICSMeeting()"><i class="fa-regular fa-calendar"></i> .ics Takim</button>
-          <button id="btn_save" class="btn ok" onclick="saveModal()"><i class="fa-solid fa-floppy-disk"></i> Ruaj</button>
+          <button class="btn ok" onclick="saveModal()"><i class="fa-solid fa-floppy-disk"></i> Ruaj</button>
         </div>
 
         <div>
@@ -274,9 +279,13 @@
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
-/* ===== SUPABASE ===== */
+/* ===== KONFIG ===== */
 const SUPABASE_URL = 'https://xsdcprmwthmqzorojykl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzZGNwcm13dGhtcXpvcm9qeWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NDU2ODUsImV4cCI6MjA3MzAyMTY4NX0.xql-MTN1szGVtdJkMmGxYRZ4mXNJ1a2vSXV2Fb1o4fw';
+
+/** Opsionale: nëse ke një webhook (Make/Zapier/Server) për email-notifications, vendose këtu.
+ *  Nëse lihet bosh, bëhet fallback në mailto: */
+const WEBHOOK_URL = ''; // p.sh. 'https://hooks.zapier.com/....'
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
@@ -287,52 +296,27 @@ console.log('[Supabase]', SUPABASE_URL);
 let LEADS = [];
 let COMMENTS = {};
 let COUNTS = new Map();
-let PROFILES = [];         // [{id,email,role}]
-let PROFILE_BY_ID = new Map();
 let CURRENT_ID = null;
-let ME = { id:null, email:null, role:null };
-
+let PROFILES = []; // {id, email, full_name, role}
+let SELF = null;   // {id, email}
 const EL = sel => document.querySelector(sel);
 const ESC = s => (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
 function todayStr(d=new Date()){ const z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
 function addDays(date,days){ const d=new Date(date); d.setDate(d.getDate()+days); return d; }
-function canEdit(){ return ME.role==='editor' || ME.role==='admin'; }
+function on(){ EL('#loading').style.display='inline-flex'; }
+function off(){ EL('#loading').style.display='none'; }
 
-/* ===== AUTH / PROFILE ===== */
-async function fetchMyProfile(){
-  const { data, error } = await sb.from('profiles').select('id,email,role').single();
-  if(error){ console.warn('[profiles self]', error); return null; }
-  return data;
-}
-async function fetchProfiles(){
-  const { data, error } = await sb.from('profiles').select('id,email,role').order('email');
-  if(error){ console.warn('[profiles all]', error); return []; }
-  return data||[];
-}
-function roleBadge(role){
-  const colors = { admin:'#1d4ed8', editor:'#16a34a', viewer:'#6b7280' };
-  const color = colors[role] || '#6b7280';
-  return `<span class="role" style="border-color:${color}; color:${color}">${role}</span>`;
-}
+/* ===== AUTH ===== */
 async function updateHeaderUser(session){
   const slot = EL('#user_slot');
-  let roleText = '';
-  if(session){
-    // Merr profilin tim
-    const p = await fetchMyProfile();
-    if(p){
-      ME.id = p.id; ME.email = p.email; ME.role = p.role;
-      roleText = ' '+roleBadge(p.role);
-      // ngarko të gjithë profilet për assignment
-      PROFILES = await fetchProfiles();
-      PROFILE_BY_ID = new Map(PROFILES.map(x=>[x.id,x]));
-    }
+  if(session?.user){
+    SELF = { id: session.user.id, email: session.user.email };
+    slot.textContent = '• ' + (session.user.email || '');
+  }else{
+    SELF = null;
+    slot.textContent = '';
   }
-  slot.innerHTML = session?.user?.email ? ('• '+ESC(session.user.email)+roleText) : '';
-  // blloko UI nëse viewer
-  EL('#btn_add').disabled = !canEdit();
 }
-
 async function requireSession(){
   const { data: { session } } = await sb.auth.getSession();
   if(session){
@@ -350,10 +334,12 @@ async function signIn(){
   const { error } = await sb.auth.signInWithPassword({ email, password });
   EL('#auth_msg').textContent = error ? (error.message || 'Login dështoi') : '';
   if(!error){
+    // fshi fragmentet e supabase (#access_token=...)
+    if (location.hash.includes('access_token')) history.replaceState({}, document.title, location.pathname + location.search);
     EL('#auth').style.display='none';
     const { data:{ session } } = await sb.auth.getSession();
     await updateHeaderUser(session);
-    await refreshLeads();
+    await bootstrap();
   }
 }
 async function signUp(){
@@ -364,19 +350,21 @@ async function signUp(){
 }
 async function signOut(){
   await sb.auth.signOut();
-  LEADS = []; COMMENTS = {}; COUNTS = new Map(); render();
+  LEADS = []; COMMENTS = {}; COUNTS = new Map(); PROFILES = []; render();
   EL('#user_slot').textContent = '';
   EL('#auth').style.display='flex';
 }
 sb.auth.onAuthStateChange(async (_evt, session) => {
-  if(session){
-    EL('#auth').style.display='none';
-    await updateHeaderUser(session);
-    await refreshLeads();
-  }else{
-    EL('#auth').style.display='flex';
-  }
+  if(session){ EL('#auth').style.display='none'; await updateHeaderUser(session); await bootstrap(); }
+  else{ EL('#auth').style.display='flex'; }
 });
+
+/* ===== DB: PROFILES ===== */
+async function fetchProfiles(){
+  const { data, error } = await sb.from('profiles').select('id,email,full_name,role').order('email', {ascending:true});
+  if(error){ console.warn('[profiles]', error); return []; }
+  return data || [];
+}
 
 /* ===== DB: COUNTS ===== */
 async function fetchCounts(){
@@ -403,49 +391,30 @@ async function fetchLeads(){
     return data||[];
   }catch(err){
     console.error('[fetchLeads]', err);
-    alert('Nuk u lexuan lead-et nga DB.\n' + (err.message || 'Kontrollo RLS/kolonat.'));
+    alert('Nuk u lexuan lead-et nga DB.\n' + (err.message || 'Kontrollo RLS/GRANT-et/kolonat.'));
     return [];
   }
 }
 
-/* ===== INSERT/UPDATE ===== */
+/* ===== INSERT lead ===== */
 async function insertLead(obj){
   const payload = {
     id: obj.id,
-    created_at: obj.created_at,
-    company: obj.company,
-    phone: obj.phone,
-    contact: obj.contact || null,
-    email: obj.email || null,
-    source: obj.source || null,
-    call_status: obj.call_status || null,
-    answer_outcome: obj.answer_outcome || null,
-    next_follow_up: obj.next_follow_up || null,
-    meeting_status: obj.meeting_status || null,
-    meeting_date: obj.meeting_date || null,
-    field_agent: obj.field_agent || null,
-    nipt: obj.nipt || null,
-    industry: obj.industry || null,
-    activity: obj.activity || null,
-    assigned_to: obj.assigned_to || null
-    // created_by vendoset automatikisht nga default auth.uid()
+    created_at: obj.created_at, company: obj.company, phone: obj.phone,
+    contact: obj.contact||null, email: obj.email||null, source: obj.source||null,
+    call_status: obj.call_status||null, answer_outcome: obj.answer_outcome||null,
+    next_follow_up: obj.next_follow_up||null, meeting_status: obj.meeting_status||null,
+    meeting_date: obj.meeting_date||null, field_agent: obj.field_agent||null,
+    nipt: obj.nipt||null, industry: obj.industry||null, activity: obj.activity||null,
+    assigned_to: obj.assigned_to||null
   };
   const { data, error } = await sb.from('leads').insert([payload]).select('id');
-  if(error){
-    console.error('[INSERT ERROR]', error);
-    alert('Shtimi në DB dështoi.\n' + (error.message || JSON.stringify(error)));
-    throw error;
-  }
+  if(error){ console.error('[INSERT ERROR]', error); alert('Shtimi në DB dështoi.\n' + (error.message||JSON.stringify(error))); throw error; }
   return data;
 }
 async function updateLeadFields(id, fields){
-  // vendos updated_by = auth.uid() në DB përmes column-it (kërkon policy update)
-  const patch = Object.assign({}, fields, { updated_by: null }); // lëre null: nuk prish insertin; updated_by mund të vendoset me trigger nëse do
-  const { error } = await sb.from('leads').update(patch).eq('id', id);
-  if(error){
-    console.warn('[updateLeadFields]', error);
-    alert('UPDATE dështoi (RLS/kolonat).');
-  }
+  const { error } = await sb.from('leads').update(fields).eq('id', id);
+  if(error){ console.warn('[updateLeadFields]', error); alert('UPDATE dështoi (RLS/kolonat).'); }
 }
 
 /* ===== DB: UPDATES/COMMENTS ===== */
@@ -478,16 +447,6 @@ async function insertComment(lead_id, text){
     alert('Nuk u ruajt komenti (lead_updates).');
   }
 }
-async function insertAssign(lead_id, assigned_to){
-  try{
-    const ass = PROFILE_BY_ID.get(assigned_to);
-    const payload = { kind:'assign', assigned_to, assigned_email: (ass?.email||null) };
-    const { error } = await sb.from('lead_updates').insert([{ lead_id, ...payload }]);
-    if(error) throw error;
-  }catch(err){
-    console.warn('[insertAssign]', err);
-  }
-}
 
 /* ===== BADGES ===== */
 function badgeCall(s){
@@ -512,13 +471,13 @@ function badgeMeeting(s){
 
 /* ===== RENDER LIST ===== */
 function render(){
-  const q = (EL('#q').value||'').toLowerCase().trim();
+  const q = EL('#q').value.toLowerCase().trim();
   const fs = EL('#flt_source').value;
   const fc = EL('#flt_call').value;
   const fr = EL('#flt_result').value;
   const fm = EL('#flt_meeting').value;
+  const mine = EL('#flt_mine').value;
   const sort = EL('#sortBy').value;
-  const onlyMine = EL('#onlyMine').checked;
 
   let arr = LEADS.filter(x=>{
     const hay = (x.company+' '+(x.contact||'')+' '+(x.phone||'')+' '+(x.email||'')).toLowerCase();
@@ -527,11 +486,14 @@ function render(){
     const passC = !fc || x.call_status===fc;
     const passR = !fr || x.answer_outcome===fr;
     const passM = !fm || x.meeting_status===fm;
-    const mine = !onlyMine || (ME?.id && (x.created_by===ME.id || x.assigned_to===ME.id));
-    return passQ && passS && passC && passR && passM && mine;
+    const passMine =
+      !mine ? true :
+      (mine==='mine' ? (x.created_by===SELF?.id) :
+       mine==='assigned' ? (x.assigned_to===SELF?.id) : true);
+    return passQ && passS && passC && passR && passM && passMine;
   });
 
-  if(sort==='created_desc') arr.sort((a,b)=> (b.created_at_ts||b.created_at||'').localeCompare(a.created_at_ts||a.created_at||''));
+  if(sort==='created_desc') arr.sort((a,b)=> (b.created_at_ts||b.created_at||'').localeCompare(a.created_at_ts||a.created_at||'')); 
   else if(sort==='created_asc') arr.sort((a,b)=> (a.created_at_ts||a.created_at||'').localeCompare(b.created_at_ts||b.created_at||'')); 
   else if(sort==='company_asc') arr.sort((a,b)=> (a.company||'').localeCompare(b.company||'')); 
   else if(sort==='company_desc') arr.sort((a,b)=> (b.company||'').localeCompare(a.company||'')); 
@@ -542,15 +504,13 @@ function render(){
   EL('#rows').innerHTML = arr.map(x=>{
     const due = x.next_follow_up && x.next_follow_up <= todayStr() ? `<span class="due">Due</span>` : '';
     const commentsCount = COUNTS.get(x.id) ?? 0;
-    const ass = x.assigned_to ? (PROFILE_BY_ID.get(x.assigned_to)?.email || '—') : '—';
-    const editBtns = canEdit()
-      ? `<button class="btn" title="Follow-up +3 ditë" onclick="quickFollow('${x.id}')"><i class="fa-regular fa-bell"></i></button>
-         <button class="btn" title="Hap" onclick="openModal('${x.id}')"><i class="fa-regular fa-pen-to-square"></i></button>`
-      : `<button class="btn" title="Shiko" onclick="openModal('${x.id}')"><i class="fa-regular fa-eye"></i></button>`;
+    const creatorEmail = (PROFILES.find(p=>p.id===x.created_by)?.email) || '—';
+    const assignedEmail = (PROFILES.find(p=>p.id===x.assigned_to)?.email) || '';
+    const assignedBadge = assignedEmail ? ` · <span class="tag" title="Assigned to">${ESC(assignedEmail)}</span>` : '';
     return `<tr>
       <td>
         <a href="#" onclick="openModal('${x.id}');return false;"><strong>${ESC(x.company)}</strong></a>
-        <br><span class="muted">${ESC((x.created_at||'').toString().slice(0,10))}</span>
+        <br><span class="muted">${ESC((x.created_at||'').toString().slice(0,10))} · ${ESC(creatorEmail)}</span>${assignedBadge}
       </td>
       <td>${ESC(x.contact||'')}<br><span class="muted">${ESC(x.phone||'')} ${x.email? ' · '+ESC(x.email):''}</span></td>
       <td><span class="tag">${ESC(x.source||'')}</span></td>
@@ -559,17 +519,17 @@ function render(){
       <td>${x.next_follow_up? ESC(x.next_follow_up): '<span class="muted">—</span>'} ${due}</td>
       <td>${badgeMeeting(x.meeting_status)}<br><span class="muted">${x.meeting_date||''}</span></td>
       <td>${ESC(x.field_agent||'')}</td>
-      <td><span class="muted">${ESC(ass)}</span></td>
       <td><a href="#" onclick="openModal('${x.id}');return false;"><i class="fa-regular fa-comment-dots"></i> ${commentsCount}</a></td>
-      <td class="nowrap">${editBtns}</td>
+      <td class="nowrap">
+        <button class="btn" title="Follow-up +3 ditë" onclick="quickFollow('${x.id}')"><i class="fa-regular fa-bell"></i></button>
+        <button class="btn" title="Hap" onclick="openModal('${x.id}')"><i class="fa-regular fa-pen-to-square"></i></button>
+      </td>
     </tr>`;
-  }).join('') || `<tr><td colspan="11" class="muted">S'ka të dhëna.</td></tr>`;
+  }).join('') || `<tr><td colspan="10" class="muted">S'ka të dhëna.</td></tr>`;
 }
 
 /* ===== ADD LEAD ===== */
 async function addLead(){
-  if(!canEdit()){ alert('Nuk ke leje për të shtuar (viewer).'); return; }
-
   const obj = {
     id: 'L'+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4),
     created_at: todayStr(),
@@ -587,58 +547,48 @@ async function addLead(){
     meeting_status: null,
     meeting_date: EL('#f_meeting_date').value || null,
     field_agent: EL('#f_field_agent').value.trim() || null,
-    _prime_note: EL('#f_notes').value.trim() || null,
-    assigned_to: null
+    assigned_to: null,
+    _prime_note: EL('#f_notes').value.trim() || null
   };
 
-  if(!obj.company || !obj.phone){
-    alert('Kompania dhe telefoni janë të detyrueshëm.');
-    return;
-  }
+  if(!obj.company || !obj.phone){ alert('Kompania dhe telefoni janë të detyrueshëm.'); return; }
   if(obj.answer_outcome==='Do ta eskaloj' || obj.answer_outcome==='Do të mendohet'){
     obj.next_follow_up = todayStr(addDays(new Date(),3));
   }
   if(obj.meeting_date) obj.meeting_status = 'Pending';
 
-  EL('#loading').style.display='inline-flex';
+  on();
   try{
     await insertLead(obj);
     try{
-      await sb.from('lead_updates').insert([{ lead_id: obj.id, kind: 'create', comment: obj._prime_note || null }]);
+      await sb.from('lead_updates').insert([{ lead_id: obj.id, kind:'create', comment:(obj._prime_note||null) }]);
     }catch(e){ console.warn('[lead_updates create] skipped:', e?.message || e); }
     await refreshLeads();
-
-    // pastro formën
     ['f_company','f_contact','f_phone','f_email','f_nipt','f_industry','f_activity','f_field_agent','f_meeting_date','f_notes']
       .forEach(id=> EL('#'+id).value='');
     EL('#f_source').value='QKB';
     EL('#f_call_status').value='Not answered';
     EL('#f_answer_outcome').value='';
-  }catch(err){
-    console.error('[addLead]', err);
-  }finally{
-    EL('#loading').style.display='none';
-  }
+  }catch(err){ console.error('[addLead]', err); }
+  finally{ off(); }
 }
 
 /* ===== MODAL ===== */
-function populateAssigneeSelect(sel, currentAssigned){
-  sel.innerHTML = '';
-  const optNone = document.createElement('option'); optNone.value=''; optNone.textContent='— asnjë —';
-  sel.appendChild(optNone);
-  PROFILES.forEach(p=>{
-    const o = document.createElement('option');
-    o.value = p.id;
-    o.textContent = `${p.email} (${p.role})`;
-    if(currentAssigned && p.id===currentAssigned) o.selected = true;
-    sel.appendChild(o);
-  });
-}
 async function openModal(id){
   CURRENT_ID = id;
   const x = LEADS.find(i=>i.id===id); if(!x) return;
+  const creatorEmail = (PROFILES.find(p=>p.id===x.created_by)?.email) || '—';
+  const updaterEmail = (PROFILES.find(p=>p.id===x.updated_by)?.email) || '';
+  const assignedEmail = (PROFILES.find(p=>p.id===x.assigned_to)?.email) || '';
+
   EL('#m_title').textContent = x.company;
   EL('#m_meta').innerHTML = `${ESC(x.contact||'')} · <span class="muted">${ESC(x.phone||'')}</span> · <span class="muted">${ESC(x.email||'')}</span>`;
+  EL('#m_audit').innerHTML = `
+    <span class="muted">Krijuar nga: ${ESC(creatorEmail)}</span>
+    ${updaterEmail? ' · <span class="muted">Përditësuar nga: '+ESC(updaterEmail)+'</span>' : ''}
+    ${assignedEmail? ' · <span class="muted">Assigned to: '+ESC(assignedEmail)+'</span>' : ''}
+  `;
+
   EL('#m_nipt').value = x.nipt || '';
   EL('#m_industry').value = x.industry || '';
   EL('#m_activity').value = x.activity || '';
@@ -651,13 +601,10 @@ async function openModal(id){
   EL('#m_phone').value = x.phone || '';
   EL('#m_comment').value = '';
 
-  populateAssigneeSelect(EL('#m_assigned_to'), x.assigned_to || '');
-
-  // viewer = read-only modal
-  const dis = !canEdit();
-  ['m_nipt','m_industry','m_activity','m_result','m_next','m_meeting_status','m_meeting_date','m_agent','m_email','m_phone','m_comment','m_assigned_to']
-    .forEach(id => EL('#'+id).disabled = dis);
-  EL('#btn_save').disabled = dis;
+  // mbush dropdown-in e asignimit
+  const sel = EL('#m_assign_to');
+  sel.innerHTML = `<option value="">— Zgjidh përdorues —</option>` + PROFILES
+    .map(p=>`<option value="${p.id}" ${x.assigned_to===p.id?'selected':''}>${ESC(p.email)} ${p.role?('· '+p.role):''}</option>`).join('');
 
   COMMENTS[id] = await fetchComments(id);
   renderTimeline(id);
@@ -668,16 +615,14 @@ function renderTimeline(id){
   const arr = COMMENTS[id] || [];
   const html = arr.map(c=>{
     const d = new Date(c.ts);
-    let meta = c.kind==='comment' ? 'Koment' : (c.kind==='create' ? 'Krijuar' : (c.kind==='assign' ? 'Caktim' : 'Përditësim'));
+    const meta = c.kind==='comment' ? 'Koment' : (c.kind==='create' ? 'Krijuar' : 'Përditësim');
     const details = [
       c.comment ? `<div>${ESC(c.comment)}</div>` : '',
       c.new_result ? `<div><strong>Rezultat:</strong> ${ESC(c.new_result)}</div>` : '',
       c.next_follow_up ? `<div><strong>Follow-up:</strong> ${ESC(c.next_follow_up)}</div>` : '',
       c.meeting_status ? `<div><strong>Takimi:</strong> ${ESC(c.meeting_status)} ${c.meeting_date? ' · '+ESC(c.meeting_date):''}</div>` : '',
       c.field_agent ? `<div><strong>Agjent:</strong> ${ESC(c.field_agent)}</div>` : '',
-      c.email ? `<div><strong>Email:</strong> ${ESC(c.email)}</div>` : '',
-      c.kind==='assign' ? `<div><strong>Assigned to:</strong> ${ESC(c.assigned_email||c.assigned_to||'—')}</div>` : '',
-      c.actor_email ? `<div class="muted">nga: ${ESC(c.actor_email)}</div>` : ''
+      c.email ? `<div><strong>Email:</strong> ${ESC(c.email)}</div>` : ''
     ].filter(Boolean).join('');
     return `<div class="card" style="padding:10px">
       <div class="muted">${meta} · ${d.toLocaleString()}</div>
@@ -690,8 +635,6 @@ function closeModal(){ EL('#modal').style.display='none'; CURRENT_ID=null; }
 
 /* ===== SAVE & QUICK FOLLOW ===== */
 async function saveModal(){
-  if(!canEdit()){ alert('Nuk ke leje për të modifikuar (viewer).'); return; }
-
   const x = LEADS.find(i=>i.id===CURRENT_ID); if(!x) return;
 
   const newResult = EL('#m_result').value || null;
@@ -704,14 +647,12 @@ async function saveModal(){
   const nipt = EL('#m_nipt').value.trim() || null;
   const industry = EL('#m_industry').value.trim() || null;
   const activity = EL('#m_activity').value.trim() || null;
-  const comment = EL('#m_comment').value.trim() || null;
-  const assigned_to = EL('#m_assigned_to').value || null;
+  const comment = EL('#m_comment').value.trim();
 
   const autoFU = (!nextFU && (newResult==='Do ta eskaloj' || newResult==='Do të mendohet')) ? todayStr(addDays(new Date(),3)) : null;
 
-  EL('#loading').style.display='inline-flex';
+  on();
   try{
-    // log update
     await insertUpdate(x.id, {
       new_result: newResult,
       next_follow_up: nextFU || autoFU,
@@ -719,23 +660,10 @@ async function saveModal(){
       meeting_date: mDate,
       field_agent: agent,
       email: email,
-      comment: comment
+      comment: comment || null
     });
+    if(comment){ await insertComment(x.id, comment); }
 
-    // po ndryshon assignment?
-    if((assigned_to||null) !== (x.assigned_to||null)){
-      await updateLeadFields(x.id, { assigned_to });
-      await insertAssign(x.id, assigned_to);
-      // email njoftues bazik (hap klientin lokal)
-      const ass = assigned_to ? (PROFILE_BY_ID.get(assigned_to)?.email||'') : '';
-      if(ass){
-        const subj = encodeURIComponent(`Lead u caktua: ${x.company}`);
-        const body = encodeURIComponent(`Përshëndetje,\n\nJu është caktuar lead-i: ${x.company}\nKontakt: ${x.contact||''}\nTel: ${x.phone||''}\n\nFaleminderit.`);
-        window.open(`mailto:${ass}?subject=${subj}&body=${body}`, '_blank');
-      }
-    }
-
-    // përditëso fushat e lead
     await updateLeadFields(x.id, {
       answer_outcome: newResult,
       next_follow_up: nextFU || autoFU,
@@ -756,15 +684,13 @@ async function saveModal(){
     console.error('[saveModal]', err);
     alert('Ruajtja dështoi.');
   }finally{
-    EL('#loading').style.display='none';
+    off();
   }
 }
 async function quickFollow(id){
-  if(!canEdit()){ alert('Nuk ke leje për të modifikuar (viewer).'); return; }
-
   const x = LEADS.find(i=>i.id===id); if(!x) return;
   const next = todayStr(addDays(new Date(),3));
-  EL('#loading').style.display='inline-flex';
+  on();
   try{
     await insertUpdate(id, { new_result: x.answer_outcome || null, next_follow_up: next });
     await updateLeadFields(id, { next_follow_up: next });
@@ -773,7 +699,71 @@ async function quickFollow(id){
     console.error('[quickFollow]', err);
     alert('S’përditësua follow-up.');
   }finally{
-    EL('#loading').style.display='none';
+    off();
+  }
+}
+
+/* ===== ASSIGN ===== */
+async function assignLead(){
+  const x = LEADS.find(i=>i.id===CURRENT_ID); if(!x) return;
+  const assignee = EL('#m_assign_to').value || null;
+  if(!assignee){ alert('Zgjidh përdoruesin për asignim.'); return; }
+
+  on();
+  try{
+    // 1) update në leads
+    await updateLeadFields(x.id, { assigned_to: assignee });
+
+    // 2) shënim në timeline
+    const assigneeEmail = (PROFILES.find(p=>p.id===assignee)?.email)||'';
+    await insertUpdate(x.id, { comment: `Assigned to ${assigneeEmail}`, new_result: x.answer_outcome||null });
+
+    // 3) njoftim email
+    await notifyAssignee({ lead: x, assigneeId: assignee, assigneeEmail });
+
+    await refreshLeads();
+    // rifresko audit section
+    openModal(x.id);
+  }catch(err){
+    console.error('[assignLead]', err);
+    alert('Asignimi dështoi.');
+  }finally{ off(); }
+}
+
+async function notifyAssignee({ lead, assigneeId, assigneeEmail }){
+  try{
+    const creatorEmail = (PROFILES.find(p=>p.id===lead.created_by)?.email) || '';
+    const title = `Lead i ri i caktuar: ${lead.company}`;
+    const body = `Përshëndetje,
+Ju është caktuar një lead i ri:
+
+• Kompania: ${lead.company}
+• Kontakt: ${lead.contact||'-'}
+• Tel: ${lead.phone||'-'}
+• Email: ${lead.email||'-'}
+• Caktuar nga: ${SELF?.email||creatorEmail||'-'}
+
+Ju lutem ndiqeni rastin në Mini-CRM.`;
+
+    if(WEBHOOK_URL){
+      await fetch(WEBHOOK_URL, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          type:'lead_assigned',
+          to: assigneeEmail,
+          subject: title,
+          text: body,
+          meta: { lead_id: lead.id, company: lead.company, assigned_to: assigneeId, assigned_email: assigneeEmail, assigned_by: SELF?.email||null }
+        })
+      });
+    }else{
+      // fallback: mailto
+      const mailto = `mailto:${encodeURIComponent(assigneeEmail)}?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+      window.open(mailto, '_blank');
+    }
+  }catch(e){
+    console.warn('[notifyAssignee]', e);
   }
 }
 
@@ -833,8 +823,7 @@ function downloadCSV(){
   const cols = ["id","created_at","company","nipt","industry","activity","contact","phone","email","source","call_status","answer_outcome","next_follow_up","meeting_status","meeting_date","field_agent","assigned_to"];
   const lines = [cols.join(',')];
   LEADS.forEach(x=>{
-    const ass = x.assigned_to ? (PROFILE_BY_ID.get(x.assigned_to)?.email || x.assigned_to) : '';
-    const row = [x.id,x.created_at,x.company,x.nipt||'',x.industry||'',x.activity||'',x.contact||'',x.phone||'',x.email||'',x.source||'',x.call_status||'',x.answer_outcome||'',x.next_follow_up||'',x.meeting_status||'',x.meeting_date||'',x.field_agent||'',ass]
+    const row = [x.id,x.created_at,x.company,x.nipt||'',x.industry||'',x.activity||'',x.contact||'',x.phone||'',x.email||'',x.source||'',x.call_status||'',x.answer_outcome||'',x.next_follow_up||'',x.meeting_status||'',x.meeting_date||'',x.field_agent||'',x.assigned_to||'']
       .map(v => `"${String(v??'').replace(/"/g,'""')}"`);
     lines.push(row.join(','));
   });
@@ -844,7 +833,7 @@ function downloadCSV(){
 
 /* ===== DATA FLOW ===== */
 async function refreshLeads(){
-  EL('#loading').style.display='inline-flex';
+  on();
   try{
     const [leads, counts] = await Promise.all([ fetchLeads(), fetchCounts() ]);
     LEADS = Array.isArray(leads) ? leads : [];
@@ -854,18 +843,26 @@ async function refreshLeads(){
     console.error('[refreshLeads]', err);
     alert('Gabim gjatë rifreskimit të të dhënave.');
   }finally{
-    EL('#loading').style.display='none';
+    off();
   }
+}
+
+async function bootstrap(){
+  on();
+  try{
+    PROFILES = await fetchProfiles();
+    await refreshLeads();
+  }finally{ off(); }
 }
 
 /* ===== INIT ===== */
 document.addEventListener('DOMContentLoaded', async ()=>{
-  // Heq fragment auth (#access_token=...) nëse Supabase kthen diçka në URL
+  // Hiq fragment auth (#access_token=...) nëse Supabase kthen diçka në URL
   if (window.location.hash && window.location.hash.includes('access_token')) {
     history.replaceState({}, document.title, window.location.pathname + window.location.search);
   }
   const ok = await requireSession();
-  if(ok){ await refreshLeads(); }
+  if(ok){ await bootstrap(); }
 });
 </script>
 </body>
