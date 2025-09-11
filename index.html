@@ -1,11 +1,6 @@
 <!DOCTYPE html>
 <html lang="sq">
 <head>
-
-git add favicon.ico
-git commit -m "Add favicon"
-git push
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ADC · Mini CRM</title>
@@ -84,7 +79,7 @@ git push
       <button class="btn" onclick="refreshLeads()"><i class="fa-solid fa-rotate"></i> Rifresko</button>
       <button class="btn" onclick="downloadCSV()"><i class="fa-solid fa-file-export"></i> Eksport CSV</button>
       <span id="user_slot" class="muted"></span>
-      <button class="btn" onclick="signOut()"><i class="fa-solid fa-right-from-bracket"></i> Dil</button>
+      <button id="logout_btn" class="btn" onclick="signOut()"><i class="fa-solid fa-right-from-bracket"></i> Dil</button>
     </div>
   </div>
 </header>
@@ -288,7 +283,7 @@ const SUPABASE_URL = 'https://xsdcprmwthmqzorojykl.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhzZGNwcm13dGhtcXpvcm9qeWtsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc0NDU2ODUsImV4cCI6MjA3MzAyMTY4NX0.xql-MTN1szGVtdJkMmGxYRZ4mXNJ1a2vSXV2Fb1o4fw';
 
 /** (OPSIONALE) Webhook për njoftim asignimi (Make/Zapier/Server).
- * Nëse lihet bosh, fallback në mailto: */
+ *  Nëse lihet bosh, fallback në mailto: */
 const WEBHOOK_URL = '';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -301,7 +296,7 @@ let COMMENTS = {};
 let COUNTS = new Map();
 let CURRENT_ID = null;
 let PROFILES = []; // {id,email,full_name,role}
-let SELF = null; // {id,email}
+let SELF = null;   // {id,email}
 const BOOT = { running:false, started:false }; // guard
 const EL = sel => document.querySelector(sel);
 const ESC = s => (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
@@ -311,44 +306,45 @@ function on(){ const e=EL('#loading'); if(e) e.style.display='inline-flex'; }
 function off(){ const e=EL('#loading'); if(e) e.style.display='none'; }
 
 /* FAILSAFE: fik spinerin në error */
-window.addEventListener('error', () => off());
+window.addEventListener('error',  () => off());
 window.addEventListener('unhandledrejection', () => off());
 setInterval(off, 10000);
 
 /* ===== AUTH ===== */
+function showAuth(show){ EL('#auth').style.display = show ? 'flex' : 'none'; }
+function setLogoutEnabled(enabled){ const b=EL('#logout_btn'); if(b){ b.disabled=!enabled; b.style.opacity=enabled?'1':'.6'; } }
+
 async function updateHeaderUser(session){
   const slot = EL('#user_slot');
   if(session?.user){
     SELF = { id: session.user.id, email: session.user.email };
     slot.textContent = '• ' + (session.user.email || '');
+    setLogoutEnabled(true);
   }else{
-    SELF = null; slot.textContent = '';
+    SELF = null;
+    slot.textContent = '';
+    setLogoutEnabled(false);
   }
 }
 async function requireSession(){
   const { data: { session }, error } = await sb.auth.getSession();
   if(error) console.warn('[getSession]', error);
-  if(session){
-    EL('#auth').style.display='none';
-    await updateHeaderUser(session);
-    return true;
-  }else{
-    EL('#auth').style.display='flex';
-    return false;
-  }
+  await updateHeaderUser(session);
+  showAuth(!session);
+  return !!session;
 }
 async function signIn(){
   const email = EL('#auth_email').value.trim();
   const password = EL('#auth_pwd').value;
   on();
   try{
-    const { error } = await sb.auth.signInWithPassword({ email, password });
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
     EL('#auth_msg').textContent = error ? (error.message || 'Login dështoi') : '';
     if(error) return;
+    // Hiq fragment auth (#access_token=...) nëse Supabase kthen diçka në URL
     if (location.hash.includes('access_token')) history.replaceState({}, document.title, location.pathname + location.search);
-    EL('#auth').style.display='none';
-    const { data:{ session } } = await sb.auth.getSession();
-    await updateHeaderUser(session);
+    await updateHeaderUser(data.session);
+    showAuth(false);
     await bootstrapOnce();
   } finally { off(); }
 }
@@ -358,21 +354,36 @@ async function signUp(){
   const { error } = await sb.auth.signUp({ email, password });
   EL('#auth_msg').textContent = error ? (error.message || 'Sign up dështoi') : 'U krijua. Kontrollo email-in (nëse kërkohet verifikim).';
 }
+function clearSupabaseStorage(){
+  try{
+    const keys = [];
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.startsWith('sb-')) keys.push(k);
+    }
+    keys.forEach(k=>localStorage.removeItem(k));
+  }catch(_){}
+}
 async function signOut(){
   on();
   try{
-    await sb.auth.signOut();
+    // Revokon sesionin aktual dhe pastron storage-in lokal
+    await sb.auth.signOut();           // server & local
+    clearSupabaseStorage();            // sigurohu që token-at lokalë hiqen
+    await updateHeaderUser(null);
+    showAuth(true);
     LEADS = []; COMMENTS = {}; COUNTS = new Map(); PROFILES = []; render();
-    EL('#user_slot').textContent = '';
-    EL('#auth').style.display='flex';
+    // opsionale: rifresko faqen për gjendje të pastër
+    // location.reload();
   } finally { off(); }
 }
 
 /* Qëndro i lidhur midis refresh-eve */
-sb.auth.onAuthStateChange(async (_evt, session) => {
+sb.auth.onAuthStateChange(async (evt, session) => {
+  // evt: SIGNED_IN | SIGNED_OUT | TOKEN_REFRESHED | USER_UPDATED | PASSWORD_RECOVERY etc.
   await updateHeaderUser(session);
-  if(session){ EL('#auth').style.display='none'; await bootstrapOnce(); }
-  else{ EL('#auth').style.display='flex'; }
+  if(session){ showAuth(false); if(!BOOT.started) await bootstrapOnce(); }
+  else{ showAuth(true); }
 });
 
 /* ===== BOOTSTRAP (guard) ===== */
@@ -380,7 +391,7 @@ async function bootstrapOnce(){
   if(BOOT.running) return;
   BOOT.running = true; BOOT.started = true; on();
   try{
-    PROFILES = await fetchProfiles(); // kërkon policy SELECT te profiles
+    PROFILES = await fetchProfiles();  // kërkon policy SELECT te profiles (shpesh USING true nëse do dropdown-in e asignimit)
     await refreshLeads();
   } catch(e){
     console.error('[bootstrap]', e);
@@ -397,7 +408,7 @@ async function fetchProfiles(){
       .order('email', {ascending:true});
     if(error){
       if(status===401 || status===403){
-        alert('S’lexohet "profiles". Kontrollo GRANT + policy SELECT (duhet USING true).');
+        alert('S’lexohet "profiles". Kontrollo GRANT + policy SELECT. (Nëse do dropdown asignimi global, policy duhet USING true).');
       }
       throw error;
     }
@@ -550,7 +561,7 @@ function render(){
   EL('#rows').innerHTML = arr.map(x=>{
     const due = x.next_follow_up && x.next_follow_up <= todayStr() ? `<span class="due">Due</span>` : '';
     const commentsCount = COUNTS.get(x.id) ?? 0;
-    const creatorEmail = (PROFILES.find(p=>p.id===x.created_by)?.email) || '—';
+    const creatorEmail  = (PROFILES.find(p=>p.id===x.created_by)?.email) || '—';
     const assignedEmail = (PROFILES.find(p=>p.id===x.assigned_to)?.email) || '';
     const assignedBadge = assignedEmail ? ` · <span class="tag" title="Assigned to">${ESC(assignedEmail)}</span>` : '';
     return `<tr>
@@ -605,11 +616,16 @@ async function addLead(){
 
   on();
   try{
+    // INSERT në leads
     await insertLead(obj);
+    // krijo rresht në timeline (kind=create) nëse ka shënim
     try{
       await sb.from('lead_updates').insert([{ lead_id: obj.id, kind:'create', comment:(obj._prime_note||null) }]);
     }catch(e){ console.warn('[lead_updates create] skipped:', e?.message || e); }
+
     await refreshLeads();
+
+    // pastro fushat
     ['f_company','f_contact','f_phone','f_email','f_nipt','f_industry','f_activity','f_field_agent','f_meeting_date','f_notes']
       .forEach(id=> EL('#'+id).value='');
     EL('#f_source').value='QKB';
@@ -890,11 +906,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   if (window.location.hash && window.location.hash.includes('access_token')) {
     history.replaceState({}, document.title, window.location.pathname + window.location.search);
   }
-  // Pris paksa derisa Supabase të ngarkojë sesionin nga storage
-  let ok = await requireSession();
+  const ok = await requireSession();
   if(ok){ await bootstrapOnce(); }
 });
 </script>
 </body>
 </html>
-
