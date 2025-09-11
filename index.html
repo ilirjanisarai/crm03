@@ -137,7 +137,7 @@
   <section class="card">
     <div class="flex" style="justify-content:space-between">
       <h2 style="margin:0;font-size:16px">Leads</h2>
-    <div class="flex">
+      <div class="flex">
         <input id="q" placeholder="Kërko (kompania, kontakt, tel, email)" oninput="render()">
         <select id="flt_source" onchange="render()">
           <option value="">Burimi (gjithë)</option><option>QKB</option><option>Google Maps</option><option>LinkedIn</option><option>Tjetër</option>
@@ -284,7 +284,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 /** (OPSIONALE) Webhook për njoftimin e asignimit me email (Make/Zapier/Server).
  *  Nëse lihet bosh, bëhet fallback në mailto: */
-const WEBHOOK_URL = ''; // p.sh. 'https://hooks.zapier.com/...' ose lëre bosh
+const WEBHOOK_URL = '';
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
@@ -297,12 +297,18 @@ let COUNTS = new Map();
 let CURRENT_ID = null;
 let PROFILES = []; // {id,email,full_name,role}
 let SELF = null;   // {id,email}
+const BOOT = { running:false, started:false }; // guard
 const EL = sel => document.querySelector(sel);
 const ESC = s => (s||'').replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;' }[m]));
 function todayStr(d=new Date()){ const z=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
 function addDays(date,days){ const d=new Date(date); d.setDate(d.getDate()+days); return d; }
-function on(){ EL('#loading').style.display='inline-flex'; }
-function off(){ EL('#loading').style.display='none'; }
+function on(){ const e=EL('#loading'); if(e) e.style.display='inline-flex'; }
+function off(){ const e=EL('#loading'); if(e) e.style.display='none'; }
+
+/* ==== FAILSAFE: fik gjithmonë spinerin në error ==== */
+window.addEventListener('error',  () => off());
+window.addEventListener('unhandledrejection', () => off());
+setInterval(off, 10000); // fallback sigurie
 
 /* ===== AUTH ===== */
 async function updateHeaderUser(session){
@@ -316,7 +322,8 @@ async function updateHeaderUser(session){
   }
 }
 async function requireSession(){
-  const { data: { session } } = await sb.auth.getSession();
+  const { data: { session }, error } = await sb.auth.getSession();
+  if(error) console.warn('[getSession]', error);
   if(session){
     EL('#auth').style.display='none';
     await updateHeaderUser(session);
@@ -329,15 +336,17 @@ async function requireSession(){
 async function signIn(){
   const email = EL('#auth_email').value.trim();
   const password = EL('#auth_pwd').value;
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-  EL('#auth_msg').textContent = error ? (error.message || 'Login dështoi') : '';
-  if(!error){
+  on();
+  try{
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    EL('#auth_msg').textContent = error ? (error.message || 'Login dështoi') : '';
+    if(error) return;
     if (location.hash.includes('access_token')) history.replaceState({}, document.title, location.pathname + location.search);
     EL('#auth').style.display='none';
     const { data:{ session } } = await sb.auth.getSession();
     await updateHeaderUser(session);
-    await bootstrap();
-  }
+    await bootstrapOnce();
+  } finally { off(); }
 }
 async function signUp(){
   const email = EL('#auth_email').value.trim();
@@ -346,21 +355,51 @@ async function signUp(){
   EL('#auth_msg').textContent = error ? (error.message || 'Sign up dështoi') : 'U krijua. Kontrollo email-in (nëse kërkohet verifikim).';
 }
 async function signOut(){
-  await sb.auth.signOut();
-  LEADS = []; COMMENTS = {}; COUNTS = new Map(); PROFILES = []; render();
-  EL('#user_slot').textContent = '';
-  EL('#auth').style.display='flex';
+  on();
+  try{
+    await sb.auth.signOut();
+    LEADS = []; COMMENTS = {}; COUNTS = new Map(); PROFILES = []; render();
+    EL('#user_slot').textContent = '';
+    EL('#auth').style.display='flex';
+  } finally { off(); }
 }
 sb.auth.onAuthStateChange(async (_evt, session) => {
-  if(session){ EL('#auth').style.display='none'; await updateHeaderUser(session); await bootstrap(); }
+  await updateHeaderUser(session);
+  if(session){ EL('#auth').style.display='none'; await bootstrapOnce(); }
   else{ EL('#auth').style.display='flex'; }
 });
 
+/* ===== BOOTSTRAP (guard) ===== */
+async function bootstrapOnce(){
+  if(BOOT.running) return; // shmang dyfishimet
+  BOOT.running = true; BOOT.started = true; on();
+  try{
+    PROFILES = await fetchProfiles();  // kërkon GRANT SELECT te profiles
+    await refreshLeads();
+  } catch(e){
+    console.error('[bootstrap]', e);
+    alert('Gabim gjatë nisjes: ' + (e?.message || e));
+  } finally { BOOT.running = false; off(); }
+}
+
 /* ===== DB: PROFILES ===== */
 async function fetchProfiles(){
-  const { data, error } = await sb.from('profiles').select('id,email,full_name,role').order('email', {ascending:true});
-  if(error){ console.warn('[profiles]', error); return []; }
-  return data || [];
+  try{
+    const { data, error, status } = await sb
+      .from('profiles')
+      .select('id,email,full_name,role')
+      .order('email', {ascending:true});
+    if(error){
+      if(status===401 || status===403){
+        alert('S’lexohet "profiles". Duhet: GRANT SELECT ON public.profiles TO authenticated; + RLS policy SELECT.');
+      }
+      throw error;
+    }
+    return data || [];
+  }catch(e){
+    console.warn('[profiles]', e);
+    return [];
+  }
 }
 
 /* ===== DB: COUNTS ===== */
@@ -410,7 +449,6 @@ async function insertLead(obj){
   return data;
 }
 async function updateLeadFields(id, fields){
-  // vendos edhe updated_by = SELF.id
   const { error } = await sb.from('leads').update({ ...fields, updated_by: SELF?.id || null }).eq('id', id);
   if(error){ console.warn('[updateLeadFields]', error); alert('UPDATE dështoi (RLS/kolonat).'); }
 }
@@ -714,18 +752,12 @@ async function assignLead(){
 
   on();
   try{
-    // 1) update në leads
     await updateLeadFields(x.id, { assigned_to: assignee });
-
-    // 2) shënim në timeline
     const assigneeEmail = (PROFILES.find(p=>p.id===assignee)?.email)||'';
     await insertUpdate(x.id, { comment: `Assigned to ${assigneeEmail}`, new_result: x.answer_outcome||null });
-
-    // 3) njoftim email
     await notifyAssignee({ lead: x, assigneeId: assignee, assigneeEmail });
-
     await refreshLeads();
-    openModal(x.id); // rifresko modal me audit të përditësuar
+    openModal(x.id);
   }catch(err){
     console.error('[assignLead]', err);
     alert('Asignimi dështoi.');
@@ -847,22 +879,19 @@ async function refreshLeads(){
   }
 }
 
+/* ===== BOOTSTRAP CALLER ===== */
 async function bootstrap(){
-  on();
-  try{
-    PROFILES = await fetchProfiles();  // kërkon GRANT SELECT te profiles
-    await refreshLeads();
-  }finally{ off(); }
+  // ruajtur për kompatibilitet, por përdorim guard-in
+  await bootstrapOnce();
 }
 
 /* ===== INIT ===== */
 document.addEventListener('DOMContentLoaded', async ()=>{
-  // Hiq fragment auth (#access_token=...) nëse Supabase kthen diçka në URL
   if (window.location.hash && window.location.hash.includes('access_token')) {
     history.replaceState({}, document.title, window.location.pathname + window.location.search);
   }
   const ok = await requireSession();
-  if(ok){ await bootstrap(); }
+  if(ok){ await bootstrapOnce(); }
 });
 </script>
 </body>
