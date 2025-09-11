@@ -305,10 +305,17 @@ function addDays(date,days){ const d=new Date(date); d.setDate(d.getDate()+days)
 function on(){ const e=EL('#loading'); if(e) e.style.display='inline-flex'; }
 function off(){ const e=EL('#loading'); if(e) e.style.display='none'; }
 
-/* ==== FAILSAFE: fik gjithmonë spinerin në error ==== */
+/* Fail-safe: fik spinerin në error */
 window.addEventListener('error',  () => off());
 window.addEventListener('unhandledrejection', () => off());
-setInterval(off, 10000); // fallback sigurie
+setInterval(off, 10000);
+
+/* ===== Auth hash cleaner ===== */
+function clearAuthHash(){
+  if (window.location.hash && window.location.hash.includes('access_token')) {
+    history.replaceState({}, document.title, window.location.pathname + window.location.search);
+  }
+}
 
 /* ===== AUTH ===== */
 async function updateHeaderUser(session){
@@ -341,7 +348,7 @@ async function signIn(){
     const { error } = await sb.auth.signInWithPassword({ email, password });
     EL('#auth_msg').textContent = error ? (error.message || 'Login dështoi') : '';
     if(error) return;
-    if (location.hash.includes('access_token')) history.replaceState({}, document.title, location.pathname + location.search);
+    clearAuthHash(); // ⬅️ PATCH
     EL('#auth').style.display='none';
     const { data:{ session } } = await sb.auth.getSession();
     await updateHeaderUser(session);
@@ -357,6 +364,7 @@ async function signUp(){
 async function signOut(){
   on();
   try{
+    clearAuthHash(); // ⬅️ PATCH: shmang re-login automatik
     await sb.auth.signOut();
     LEADS = []; COMMENTS = {}; COUNTS = new Map(); PROFILES = []; render();
     EL('#user_slot').textContent = '';
@@ -371,7 +379,7 @@ sb.auth.onAuthStateChange(async (_evt, session) => {
 
 /* ===== BOOTSTRAP (guard) ===== */
 async function bootstrapOnce(){
-  if(BOOT.running) return; // shmang dyfishimet
+  if(BOOT.running) return;
   BOOT.running = true; BOOT.started = true; on();
   try{
     PROFILES = await fetchProfiles();  // kërkon GRANT SELECT te profiles
@@ -391,7 +399,7 @@ async function fetchProfiles(){
       .order('email', {ascending:true});
     if(error){
       if(status===401 || status===403){
-        alert('S’lexohet "profiles". Duhet: GRANT SELECT ON public.profiles TO authenticated; + RLS policy SELECT.');
+        alert('S’lexohet "profiles". Sigurohu që ke: policy SELECT për authenticated + GRANT SELECT.');
       }
       throw error;
     }
@@ -641,7 +649,6 @@ async function openModal(id){
   EL('#m_phone').value = x.phone || '';
   EL('#m_comment').value = '';
 
-  // mbush dropdown-in e asignimit
   const sel = EL('#m_assign_to');
   sel.innerHTML = `<option value="">— Zgjidh përdorues —</option>` + PROFILES
     .map(p=>`<option value="${p.id}" ${x.assigned_to===p.id?'selected':''}>${ESC(p.email)} ${p.role?('· '+p.role):''}</option>`).join('');
@@ -879,17 +886,9 @@ async function refreshLeads(){
   }
 }
 
-/* ===== BOOTSTRAP CALLER ===== */
-async function bootstrap(){
-  // ruajtur për kompatibilitet, por përdorim guard-in
-  await bootstrapOnce();
-}
-
 /* ===== INIT ===== */
 document.addEventListener('DOMContentLoaded', async ()=>{
-  if (window.location.hash && window.location.hash.includes('access_token')) {
-    history.replaceState({}, document.title, window.location.pathname + window.location.search);
-  }
+  clearAuthHash(); // ⬅️ PATCH
   const ok = await requireSession();
   if(ok){ await bootstrapOnce(); }
 });
